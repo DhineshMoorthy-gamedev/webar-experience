@@ -1,6 +1,5 @@
-import * as THREE from 'three';
 import { ExperienceConfig } from '../config/experience.ts';
-import { TargetTracker } from './TargetTracker.ts';
+import { TargetTracker, ImageTargetDetail } from './TargetTracker.ts';
 import { AnimationController } from './AnimationController.ts';
 
 export interface ARExperienceCallbacks {
@@ -14,12 +13,10 @@ export interface ARExperienceCallbacks {
 export class ARExperience {
   private tracker: TargetTracker | null = null;
   private animController: AnimationController | null = null;
-  private renderer: THREE.WebGLRenderer | null = null;
-  private scene: THREE.Scene | null = null;
-  private camera: THREE.PerspectiveCamera | null = null;
   private isRunning = false;
   private lostGraceTimeout: number | null = null;
-  private readonly GRACE_PERIOD_MS = 750; // Keep tracking active across minor frame drops
+  private readonly GRACE_PERIOD_MS = 1200; // 1.2s grace window for fast panning and momentary motion blur
+  private initPromise: Promise<void> | null = null;
 
   constructor(
     private container: HTMLElement,
@@ -28,75 +25,85 @@ export class ARExperience {
   ) {}
 
   public async initialize(): Promise<void> {
-    this.callbacks.onStatusChange?.('Initializing AR tracking engine...');
+    if (this.initPromise) {
+      return this.initPromise;
+    }
 
-    this.tracker = new TargetTracker(this.container, this.config, {
-      onTargetFound: () => {
-        // Cancel pending target loss grace timeout
-        if (this.lostGraceTimeout !== null) {
-          window.clearTimeout(this.lostGraceTimeout);
-          this.lostGraceTimeout = null;
-        }
+    this.initPromise = (async () => {
+      this.callbacks.onStatusChange?.('Configuring 8th Wall AR Pipeline...');
 
-        if (this.animController && this.config.autoPlayAnimation) {
-          this.animController.play();
-        }
-        this.callbacks.onTargetFound?.();
-      },
-      onTargetLost: () => {
-        // Debounce target lost with grace period to prevent flickering/restarting
-        if (this.lostGraceTimeout !== null) {
-          window.clearTimeout(this.lostGraceTimeout);
-        }
+      this.tracker = new TargetTracker(this.container, this.config, {
+        onSessionStarted: async (scene) => {
+          try {
+            this.callbacks.onStatusChange?.('Loading 3D animated avatar...');
+            this.animController = new AnimationController(scene, this.config);
+            await this.animController.loadModel();
 
-        this.lostGraceTimeout = window.setTimeout(() => {
-          if (this.animController) {
-            this.animController.pause();
+            this.callbacks.onStatusChange?.('Scanning full screen for poster...');
+            this.callbacks.onReady?.();
+          } catch (err: any) {
+            const error = err instanceof Error ? err : new Error(String(err));
+            this.callbacks.onError?.(error);
           }
-          this.callbacks.onTargetLost?.();
-          this.lostGraceTimeout = null;
-        }, this.GRACE_PERIOD_MS);
-      },
-      onError: (err) => {
-        this.callbacks.onError?.(err);
-      }
-    });
+        },
+        onTick: () => {
+          if (this.isRunning && this.animController) {
+            this.animController.update();
+          }
+        },
+        onTargetFound: (detail: ImageTargetDetail) => {
+          if (this.lostGraceTimeout !== null) {
+            window.clearTimeout(this.lostGraceTimeout);
+            this.lostGraceTimeout = null;
+          }
 
-    const { renderer, scene, camera, anchorGroup } = await this.tracker.init();
-    this.renderer = renderer;
-    this.scene = scene;
-    this.camera = camera;
+          if (this.animController) {
+            this.animController.updatePose(detail.position, detail.rotation, detail.scale);
+            if (this.config.autoPlayAnimation) {
+              this.animController.play();
+            }
+          }
+          this.callbacks.onTargetFound?.();
+        },
+        onTargetUpdated: (detail: ImageTargetDetail) => {
+          if (this.animController) {
+            this.animController.updatePose(detail.position, detail.rotation, detail.scale);
+          }
+        },
+        onTargetLost: () => {
+          if (this.lostGraceTimeout !== null) {
+            window.clearTimeout(this.lostGraceTimeout);
+          }
 
-    this.callbacks.onStatusChange?.('Loading 3D avatar & animations...');
-    this.animController = new AnimationController(scene, anchorGroup, this.config);
-    await this.animController.loadModel();
+          this.lostGraceTimeout = window.setTimeout(() => {
+            if (this.animController) {
+              this.animController.pause();
+            }
+            this.callbacks.onTargetLost?.();
+            this.lostGraceTimeout = null;
+          }, this.GRACE_PERIOD_MS);
+        },
+        onError: (err) => {
+          this.callbacks.onError?.(err);
+        }
+      });
 
-    this.callbacks.onStatusChange?.('AR Experience ready');
-    this.callbacks.onReady?.();
+      await this.tracker.init();
+    })();
+
+    return this.initPromise;
   }
 
   public async start(): Promise<void> {
-    if (!this.tracker || !this.renderer || !this.scene || !this.camera) {
-      throw new Error('ARExperience not initialized. Call initialize() first.');
+    await this.initialize();
+
+    if (!this.tracker) {
+      throw new Error('Tracker could not be initialized.');
     }
 
-    this.callbacks.onStatusChange?.('Starting camera video stream...');
+    this.callbacks.onStatusChange?.('Requesting camera access...');
     await this.tracker.start();
     this.isRunning = true;
-
-    // Continuous 60fps render & animation loop
-    this.renderer.setAnimationLoop(() => {
-      if (this.isRunning) {
-        if (this.animController) {
-          this.animController.update();
-        }
-        if (this.scene && this.camera && this.renderer) {
-          this.renderer.render(this.scene, this.camera);
-        }
-      }
-    });
-
-    this.callbacks.onStatusChange?.('Point camera at the poster');
   }
 
   public stop(): void {
@@ -104,9 +111,6 @@ export class ARExperience {
     if (this.lostGraceTimeout !== null) {
       window.clearTimeout(this.lostGraceTimeout);
       this.lostGraceTimeout = null;
-    }
-    if (this.renderer) {
-      this.renderer.setAnimationLoop(null);
     }
     if (this.animController) {
       this.animController.pause();

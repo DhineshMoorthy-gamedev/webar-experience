@@ -1,101 +1,180 @@
 import * as THREE from 'three';
+(window as any).THREE = THREE;
 import { ExperienceConfig } from '../config/experience.ts';
 
+export interface ImageTargetDetail {
+  name: string;
+  position: { x: number; y: number; z: number };
+  rotation: { x: number; y: number; z: number; w: number };
+  scale: number;
+}
+
 export interface TrackerCallbacks {
-  onTargetFound?: () => void;
+  onSessionStarted?: (scene: THREE.Scene, camera: THREE.PerspectiveCamera, renderer: THREE.WebGLRenderer) => void;
+  onTargetFound?: (detail: ImageTargetDetail) => void;
+  onTargetUpdated?: (detail: ImageTargetDetail) => void;
   onTargetLost?: () => void;
-  onProgress?: (progress: number) => void;
+  onTick?: () => void;
   onError?: (err: Error) => void;
 }
 
-export interface MindARThreeInstance {
-  renderer: THREE.WebGLRenderer;
-  scene: THREE.Scene;
-  camera: THREE.PerspectiveCamera;
-  addAnchor: (targetIndex: number) => {
-    group: THREE.Group;
-    targetIndex: number;
-    onTargetFound?: () => void;
-    onTargetLost?: () => void;
-  };
-  start: () => Promise<void>;
-  stop: () => void;
+declare global {
+  interface Window {
+    XR8?: any;
+  }
 }
 
-type MindARThreeConstructor = new (options: Record<string, unknown>) => MindARThreeInstance;
-
 export class TargetTracker {
-  private mindarThree: MindARThreeInstance | null = null;
-  private anchorGroup: THREE.Group | null = null;
   private isTracking = false;
+  private canvasElement: HTMLCanvasElement;
+  private isInitialized = false;
+  private xr8Promise: Promise<any> | null = null;
 
   constructor(
     private container: HTMLElement,
     private config: ExperienceConfig,
     private callbacks: TrackerCallbacks = {}
-  ) {}
+  ) {
+    let canvas = this.container.querySelector('canvas') as HTMLCanvasElement;
+    if (!canvas) {
+      canvas = document.createElement('canvas');
+      canvas.id = 'camera-canvas';
+      this.container.appendChild(canvas);
+    }
+    
+    // Set high-DPI canvas resolution for crisp rendering
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.round(window.innerWidth * dpr);
+    canvas.height = Math.round(window.innerHeight * dpr);
+    canvas.style.width = '100%';
+    canvas.style.height = '100%';
+    canvas.style.objectFit = 'cover';
 
-  public async init(): Promise<{
-    renderer: THREE.WebGLRenderer;
-    scene: THREE.Scene;
-    camera: THREE.PerspectiveCamera;
-    anchorGroup: THREE.Group;
-  }> {
-    // Check for Secure Context & mediaDevices support
+    this.canvasElement = canvas;
+  }
+
+  public async init(): Promise<void> {
+    if (this.isInitialized) return;
+
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       if (!window.isSecureContext) {
         throw new Error(
-          'Camera access requires a Secure Context (HTTPS or localhost). Mobile browsers block camera access on plain HTTP IP addresses (e.g. http://192.168.x.x). Please connect via HTTPS.'
+          'Camera access requires a Secure Context (HTTPS or localhost). Please connect via HTTPS.'
         );
       } else {
-        throw new Error(
-          'Your browser does not support camera media stream (navigator.mediaDevices.getUserMedia is unavailable).'
-        );
+        throw new Error('Your browser does not support camera media streams.');
       }
     }
 
-    const MindARThreeClass = await this.loadMindARClass();
+    const XR8 = await this.loadXR8();
+    if (!XR8) {
+      throw new Error('8th Wall XR8 engine failed to initialize.');
+    }
 
-    // Resolve target src relative to base URI for GitHub Pages compatibility
-    const targetUrl = new URL(this.config.targetSrc, document.baseURI).href;
+    // Explicitly load the SLAM and image tracking engine chunk
+    await XR8.loadChunk('slam');
 
-    this.mindarThree = new MindARThreeClass({
-      container: this.container,
-      imageTargetSrc: targetUrl,
-      filterMinCF: this.config.filterMinCF ?? 0.0001,
-      filterBeta: this.config.filterBeta ?? 0.001,
-      warmupTolerance: this.config.warmupTolerance ?? 5,
-      missTolerance: this.config.missTolerance ?? 5
+    // Load Target Descriptor JSON
+    const jsonUrl = new URL(this.config.targetJsonSrc, document.baseURI).href;
+    let targetJsonData: any = null;
+    try {
+      const resp = await fetch(jsonUrl);
+      if (resp.ok) {
+        targetJsonData = await resp.json();
+      }
+    } catch (e) {
+      console.warn('Could not fetch target JSON descriptor:', e);
+    }
+
+    const anyDevice = XR8.XrConfig.device().ANY;
+
+    // Create 8th Wall custom pipeline module
+    const customPipelineModule = {
+      name: 'webar-image-tracker',
+      onStart: () => {
+        try {
+          const { scene, camera, renderer } = XR8.Threejs.xrScene();
+          renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+          this.callbacks.onSessionStarted?.(scene, camera, renderer);
+        } catch (err: any) {
+          this.callbacks.onError?.(err);
+        }
+      },
+      onUpdate: () => {
+        this.callbacks.onTick?.();
+      },
+      listeners: [
+        {
+          event: 'reality.imagefound',
+          process: ({ detail }: { detail: ImageTargetDetail }) => {
+            this.isTracking = true;
+            this.callbacks.onTargetFound?.(detail);
+          }
+        },
+        {
+          event: 'reality.imageupdated',
+          process: ({ detail }: { detail: ImageTargetDetail }) => {
+            this.callbacks.onTargetUpdated?.(detail);
+          }
+        },
+        {
+          event: 'reality.imagelost',
+          process: () => {
+            this.isTracking = false;
+            this.callbacks.onTargetLost?.();
+          }
+        }
+      ]
+    };
+
+    // Instantiate pipeline modules and register them
+    const glModule = XR8.GlTextureRenderer.pipelineModule();
+    const threeModule = XR8.Threejs.pipelineModule();
+    const xrModule = XR8.XrController.pipelineModule();
+
+    XR8.addCameraPipelineModules([
+      glModule,
+      threeModule,
+      xrModule,
+      customPipelineModule
+    ]);
+
+    // Configure Three.js and XrController for all devices
+    XR8.Threejs.configure({
+      cameraDirection: 'back',
+      allowedDevices: anyDevice
     });
 
-    const anchor = this.mindarThree.addAnchor(0);
-    this.anchorGroup = anchor.group;
-
-    anchor.onTargetFound = () => {
-      this.isTracking = true;
-      this.callbacks.onTargetFound?.();
+    const xrConfig: any = {
+      allowedDevices: anyDevice,
+      disableWorldTracking: true
     };
 
-    anchor.onTargetLost = () => {
-      this.isTracking = false;
-      this.callbacks.onTargetLost?.();
-    };
+    if (targetJsonData) {
+      xrConfig.imageTargetData = [targetJsonData];
+    } else {
+      xrConfig.imageTargets = ['sample-poster'];
+    }
 
-    return {
-      renderer: this.mindarThree.renderer,
-      scene: this.mindarThree.scene,
-      camera: this.mindarThree.camera,
-      anchorGroup: this.anchorGroup
-    };
+    XR8.XrController.configure(xrConfig);
+
+    this.isInitialized = true;
   }
 
   public async start(): Promise<void> {
-    if (!this.mindarThree) {
-      throw new Error('TargetTracker not initialized. Call init() first.');
+    const XR8 = await this.loadXR8();
+    if (!XR8) {
+      throw new Error('8th Wall XR8 engine not loaded.');
     }
 
+    const anyDevice = XR8.XrConfig.device().ANY;
+
     try {
-      await this.mindarThree.start();
+      XR8.run({
+        canvas: this.canvasElement,
+        allowedDevices: anyDevice,
+        verbose: true
+      });
     } catch (err: unknown) {
       const error = err instanceof Error ? err : new Error(String(err));
       this.callbacks.onError?.(error);
@@ -104,8 +183,13 @@ export class TargetTracker {
   }
 
   public stop(): void {
-    if (this.mindarThree) {
-      this.mindarThree.stop();
+    const XR8 = window.XR8;
+    if (XR8) {
+      try {
+        XR8.stop();
+      } catch (e) {
+        console.warn('XR8 stop warning:', e);
+      }
       this.isTracking = false;
     }
   }
@@ -114,41 +198,35 @@ export class TargetTracker {
     return this.isTracking;
   }
 
-  public getAnchorGroup(): THREE.Group | null {
-    return this.anchorGroup;
-  }
-
-  private async loadMindARClass(): Promise<MindARThreeConstructor> {
-    const globalCls = (window as any).MINDAR?.IMAGE?.MindARThree;
-    if (globalCls) return globalCls;
-
-    const scriptUrl = new URL('libs/mindar-image-three.prod.js', document.baseURI).href;
-
-    try {
-      const mod: any = await import(/* @vite-ignore */ scriptUrl);
-      const Cls = mod.MindARThree || (window as any).MINDAR?.IMAGE?.MindARThree;
-      if (Cls) return Cls;
-    } catch (err) {
-      console.warn('Direct dynamic import failed, loading module script tag...', err);
+  private async loadXR8(): Promise<any> {
+    if (window.XR8) {
+      return window.XR8;
     }
 
-    return new Promise((resolve, reject) => {
-      const script = document.createElement('script');
-      script.type = 'module';
-      script.textContent = `
-        import { MindARThree } from '${scriptUrl}';
-        window.MINDAR = window.MINDAR || {};
-        window.MINDAR.IMAGE = window.MINDAR.IMAGE || {};
-        window.MINDAR.IMAGE.MindARThree = MindARThree;
-        window.dispatchEvent(new CustomEvent('mindar-loaded'));
-      `;
-      window.addEventListener('mindar-loaded', () => {
-        const Cls = (window as any).MINDAR?.IMAGE?.MindARThree;
-        if (Cls) resolve(Cls);
-        else reject(new Error('Failed to retrieve MindARThree from global'));
+    if (this.xr8Promise) {
+      return this.xr8Promise;
+    }
+
+    this.xr8Promise = new Promise((resolve, reject) => {
+      const checkInterval = setInterval(() => {
+        if (window.XR8) {
+          clearInterval(checkInterval);
+          resolve(window.XR8);
+        }
+      }, 50);
+
+      window.addEventListener('xrloaded', () => {
+        clearInterval(checkInterval);
+        resolve(window.XR8);
       }, { once: true });
-      script.onerror = () => reject(new Error(`Failed to load MindAR from ${scriptUrl}`));
-      document.head.appendChild(script);
+
+      setTimeout(() => {
+        clearInterval(checkInterval);
+        if (window.XR8) resolve(window.XR8);
+        else reject(new Error('Timed out waiting for 8th Wall XR8 engine.'));
+      }, 30000);
     });
+
+    return this.xr8Promise;
   }
 }

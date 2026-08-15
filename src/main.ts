@@ -1,3 +1,7 @@
+import * as THREE from 'three';
+// Expose THREE globally for 8th Wall XR8.Threejs pipeline module
+(window as any).THREE = THREE;
+
 import './style.css';
 import { DEFAULT_EXPERIENCE } from './config/experience.ts';
 import { ARExperience } from './ar/ARExperience.ts';
@@ -32,33 +36,39 @@ class App {
         await this.restartExperience();
       }
     });
+
+    // Create AR instance immediately
+    this.arExperience = new ARExperience(this.arContainer, DEFAULT_EXPERIENCE, {
+      onStatusChange: (status) => {
+        this.uiController?.setStatusMessage(status);
+      },
+      onReady: () => {
+        this.uiController?.setState('SCANNING');
+      },
+      onTargetFound: () => {
+        this.uiController?.setState('TRACKING');
+      },
+      onTargetLost: () => {
+        this.uiController?.setState('SCANNING');
+      },
+      onError: (err) => {
+        console.error('AR Experience Error:', err);
+        this.uiController?.setError('AR Tracking Error', err.message);
+      }
+    });
+
+    // Pre-initialize in background on page load
+    this.arExperience.initialize().catch((err) => {
+      console.warn('Pre-initialize background note:', err);
+    });
   }
 
   private async startExperience(): Promise<void> {
-    if (!this.uiController) return;
+    if (!this.uiController || !this.arExperience) return;
 
     try {
-      this.uiController.setState('STARTING', 'Initializing AR Engine & Camera...');
-      
-      this.arExperience = new ARExperience(this.arContainer, DEFAULT_EXPERIENCE, {
-        onStatusChange: (status) => {
-          this.uiController?.setStatusMessage(status);
-        },
-        onTargetFound: () => {
-          this.uiController?.setState('TRACKING');
-        },
-        onTargetLost: () => {
-          this.uiController?.setState('SCANNING');
-        },
-        onError: (err) => {
-          console.error('AR Experience Error:', err);
-          this.uiController?.setError('AR Tracking Error', err.message);
-        }
-      });
-
-      await this.arExperience.initialize();
+      this.uiController.setState('STARTING', 'Starting Camera & AR Tracking...');
       await this.arExperience.start();
-      this.uiController.setState('SCANNING');
     } catch (err: unknown) {
       console.error('Failed to start experience:', err);
       const message = err instanceof Error ? err.message : String(err);
@@ -70,11 +80,6 @@ class App {
   private stopExperience(): void {
     if (this.arExperience) {
       this.arExperience.stop();
-      this.arExperience = null;
-    }
-    // Clean up video/canvas elements added by MindAR
-    if (this.arContainer) {
-      this.arContainer.innerHTML = '';
     }
   }
 
