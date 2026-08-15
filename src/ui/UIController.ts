@@ -69,9 +69,9 @@ export class UIController {
               <img src="${this.config.posterImageSrc}" alt="Target Poster Preview" />
             </div>
             <div class="preview-meta">
-              <span class="preview-label">Target Marker</span>
+              <span class="preview-label">Target Poster</span>
               <span class="preview-name">sample-poster.jpg</span>
-              <span class="preview-hint">Tap to view / print poster</span>
+              <span class="preview-hint">Tap to view / present on laptop</span>
             </div>
           </div>
 
@@ -98,17 +98,17 @@ export class UIController {
             <div class="radar-sweep"></div>
           </div>
           <h2 class="loading-title">Initializing Experience</h2>
-          <p class="loading-status" id="loading-status-text">Loading AR tracking engine...</p>
+          <p class="loading-status" id="loading-status-text">Loading HD Camera & AR Engine...</p>
         </div>
       </section>
 
-      <!-- 3. Active AR Viewfinder & Overlay (SCANNING & TRACKING) -->
+      <!-- 3. Active AR Viewfinder & Overlay (FULL SCREEN EDGE-TO-EDGE) -->
       <section class="ui-screen ui-screen-active" id="screen-active">
         <!-- Top Navigation / Status Header -->
         <header class="ar-hud-header">
           <div class="tracking-pill" id="tracking-status-pill">
             <span class="pill-beacon"></span>
-            <span class="pill-text" id="hud-status-text">Looking for poster...</span>
+            <span class="pill-text" id="hud-status-text">Scanning full screen for poster...</span>
           </div>
 
           <div class="hud-actions">
@@ -128,23 +128,22 @@ export class UIController {
           </div>
         </header>
 
-        <!-- Viewfinder Reticle Frame -->
-        <div class="viewfinder-container" id="viewfinder-frame">
-          <div class="reticle-box">
-            <div class="corner corner-tl"></div>
-            <div class="corner corner-tr"></div>
-            <div class="corner corner-bl"></div>
-            <div class="corner corner-br"></div>
-            <div class="scan-beam"></div>
-          </div>
-          <div class="viewfinder-hint" id="viewfinder-hint">Point camera directly at the poster</div>
+        <!-- Full-Screen Viewfinder Frame (Spans Full Screen) -->
+        <div class="fullscreen-scan-frame" id="viewfinder-frame">
+          <div class="fs-corner fs-corner-tl"></div>
+          <div class="fs-corner fs-corner-tr"></div>
+          <div class="fs-corner fs-corner-bl"></div>
+          <div class="fs-corner fs-corner-br"></div>
+          <div class="fullscreen-scan-beam"></div>
         </div>
 
-        <!-- Mini Poster Reference in corner -->
-        <aside class="mini-target-badge" id="mini-target-badge">
-          <img src="${this.config.posterImageSrc}" alt="Target Thumbnail" />
-          <span>Poster Target</span>
-        </aside>
+        <div class="bottom-hud-bar">
+          <aside class="mini-target-badge" id="mini-target-badge">
+            <img src="${this.config.posterImageSrc}" alt="Target Thumbnail" />
+            <span>Target Poster</span>
+          </aside>
+          <div class="viewfinder-hint" id="viewfinder-hint">Scan from any distance (point anywhere at poster)</div>
+        </div>
       </section>
 
       <!-- 4. ERROR Modal -->
@@ -165,7 +164,7 @@ export class UIController {
             <p><strong>Troubleshooting:</strong></p>
             <ul>
               <li>Ensure camera permission is allowed in browser site settings.</li>
-              <li>When testing on mobile, use HTTPS or localhost.</li>
+              <li>Connect via HTTPS (e.g. https://192.168.x.x:5173).</li>
               <li>Use Google Chrome, Safari, or Microsoft Edge.</li>
             </ul>
           </div>
@@ -175,23 +174,26 @@ export class UIController {
         </div>
       </section>
 
-      <!-- 5. Modal: Poster Preview & Download -->
+      <!-- 5. Modal: Poster Preview & Fullscreen Presentation Mode -->
       <div class="poster-modal" id="poster-modal" style="display: none;">
         <div class="poster-modal-backdrop" id="poster-modal-backdrop"></div>
-        <div class="poster-modal-content glass-panel">
+        <div class="poster-modal-content glass-panel" id="poster-modal-content">
           <div class="modal-header">
-            <h3>Sample AR Poster</h3>
+            <h3>Sample AR Target Poster</h3>
             <button class="close-btn" id="btn-close-poster-modal">✕</button>
           </div>
           <div class="modal-body">
-            <p>Scan this image using another device or print it:</p>
-            <div class="full-poster-wrapper">
+            <p>Display this poster on your laptop or print it for testing:</p>
+            <div class="full-poster-wrapper" id="poster-display-box">
               <img src="${this.config.posterImageSrc}" alt="AR Sample Poster" />
             </div>
           </div>
           <div class="modal-footer">
+            <button class="primary-btn-sm" id="btn-toggle-fullscreen-poster">
+              🖥️ Maximize On Screen (Best for Phone Scanning)
+            </button>
             <a href="${this.config.posterImageSrc}" download="sample-poster.jpg" class="secondary-btn">
-              Download Poster Image
+              Download Image
             </a>
           </div>
         </div>
@@ -207,7 +209,6 @@ export class UIController {
   }
 
   private bindEvents(): void {
-    // Start Camera Button
     const startBtn = this.rootElement.querySelector('#btn-start-camera');
     startBtn?.addEventListener('click', async () => {
       this.setState('STARTING');
@@ -219,14 +220,12 @@ export class UIController {
       }
     });
 
-    // Stop Button
     const stopBtn = this.rootElement.querySelector('#btn-stop-camera');
     stopBtn?.addEventListener('click', () => {
       this.callbacks.onStopRequested();
       this.setState('IDLE');
     });
 
-    // Retry Button
     const retryBtn = this.rootElement.querySelector('#btn-retry');
     retryBtn?.addEventListener('click', () => {
       this.callbacks.onRestartRequested();
@@ -247,6 +246,19 @@ export class UIController {
 
     const backdrop = this.rootElement.querySelector('#poster-modal-backdrop');
     backdrop?.addEventListener('click', () => this.showPosterModal(false));
+
+    // Fullscreen presentation toggle
+    const fsBtn = this.rootElement.querySelector('#btn-toggle-fullscreen-poster');
+    fsBtn?.addEventListener('click', () => {
+      const modalBox = this.rootElement.querySelector('#poster-modal-content');
+      if (modalBox) {
+        if (!document.fullscreenElement) {
+          modalBox.requestFullscreen().catch(() => {});
+        } else {
+          document.exitFullscreen().catch(() => {});
+        }
+      }
+    });
   }
 
   private showPosterModal(show: boolean): void {
@@ -278,9 +290,9 @@ export class UIController {
         trackingPill.classList.remove('tracking-active');
         trackingPill.classList.add('tracking-searching');
       }
-      if (hudStatusText) hudStatusText.textContent = 'Searching for poster...';
+      if (hudStatusText) hudStatusText.textContent = 'Scanning full screen for poster...';
       if (viewfinderFrame) viewfinderFrame.classList.remove('tracking-locked');
-      if (viewfinderHint) viewfinderHint.textContent = 'Point camera directly at the poster';
+      if (viewfinderHint) viewfinderHint.textContent = 'Scan anywhere across screen (natural distance)';
     } else if (this.currentState === 'TRACKING') {
       if (trackingPill) {
         trackingPill.classList.remove('tracking-searching');
@@ -288,7 +300,7 @@ export class UIController {
       }
       if (hudStatusText) hudStatusText.textContent = '✓ Poster Detected';
       if (viewfinderFrame) viewfinderFrame.classList.add('tracking-locked');
-      if (viewfinderHint) viewfinderHint.textContent = 'Animation Playing';
+      if (viewfinderHint) viewfinderHint.textContent = 'Animation Active & Locked';
     }
   }
 }

@@ -13615,7 +13615,7 @@ class Zb {
         audio: !1,
         video: {}
       };
-      this.shouldFaceUser ? this.userDeviceId ? a.video.deviceId = { exact: this.userDeviceId } : a.video.facingMode = "user" : this.environmentDeviceId ? a.video.deviceId = { exact: this.environmentDeviceId } : a.video.facingMode = "environment", navigator.mediaDevices.getUserMedia(a).then((r) => {
+      this.shouldFaceUser ? this.userDeviceId ? a.video.deviceId = { exact: this.userDeviceId } : a.video.facingMode = "user" : this.environmentDeviceId ? a.video.deviceId = { exact: this.environmentDeviceId } : (a.video.facingMode = "environment", a.video.width = { ideal: 1920, min: 1280 }, a.video.height = { ideal: 1080, min: 720 }), navigator.mediaDevices.getUserMedia(a).then((r) => {
         this.video.addEventListener("loadedmetadata", () => {
           this.video.setAttribute("width", this.video.videoWidth), this.video.setAttribute("height", this.video.videoHeight), e();
         }), this.video.srcObject = r;

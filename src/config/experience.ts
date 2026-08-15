@@ -22,12 +22,12 @@ export const DEFAULT_EXPERIENCE: ExperienceConfig = {
   targetSrc: './targets/sample-poster.mind',
   posterImageSrc: './targets/sample-poster.jpg',
   modelSrc: './models/sample-animation.glb',
-  modelScale: [1, 1, 1],
+  modelScale: [1.85, 1.85, 1.85], // Enlarged to fill the target poster width with prominent presence
   modelPosition: [0, 0, 0],
   modelRotation: [0, 0, 0],
   autoPlayAnimation: true,
-  filterMinCF: 0.0001,
-  filterBeta: 0.001,
-  warmupTolerance: 5,
-  missTolerance: 5
+  filterMinCF: 0.0001,            // Zero stationary jitter
+  filterBeta: 0.05,               // Smooth pose interpolation
+  warmupTolerance: 1,             // Instant lock at long distance (1 frame match)
+  missTolerance: 15               // Resilient tracking through hand shake
 };

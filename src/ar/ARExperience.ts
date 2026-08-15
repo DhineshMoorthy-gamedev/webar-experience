@@ -18,6 +18,8 @@ export class ARExperience {
   private scene: THREE.Scene | null = null;
   private camera: THREE.PerspectiveCamera | null = null;
   private isRunning = false;
+  private lostGraceTimeout: number | null = null;
+  private readonly GRACE_PERIOD_MS = 750; // Keep tracking active across minor frame drops
 
   constructor(
     private container: HTMLElement,
@@ -30,16 +32,30 @@ export class ARExperience {
 
     this.tracker = new TargetTracker(this.container, this.config, {
       onTargetFound: () => {
+        // Cancel pending target loss grace timeout
+        if (this.lostGraceTimeout !== null) {
+          window.clearTimeout(this.lostGraceTimeout);
+          this.lostGraceTimeout = null;
+        }
+
         if (this.animController && this.config.autoPlayAnimation) {
           this.animController.play();
         }
         this.callbacks.onTargetFound?.();
       },
       onTargetLost: () => {
-        if (this.animController) {
-          this.animController.pause();
+        // Debounce target lost with grace period to prevent flickering/restarting
+        if (this.lostGraceTimeout !== null) {
+          window.clearTimeout(this.lostGraceTimeout);
         }
-        this.callbacks.onTargetLost?.();
+
+        this.lostGraceTimeout = window.setTimeout(() => {
+          if (this.animController) {
+            this.animController.pause();
+          }
+          this.callbacks.onTargetLost?.();
+          this.lostGraceTimeout = null;
+        }, this.GRACE_PERIOD_MS);
       },
       onError: (err) => {
         this.callbacks.onError?.(err);
@@ -68,7 +84,7 @@ export class ARExperience {
     await this.tracker.start();
     this.isRunning = true;
 
-    // Start Three.js render loop with animation mixer tick
+    // Continuous 60fps render & animation loop
     this.renderer.setAnimationLoop(() => {
       if (this.isRunning) {
         if (this.animController) {
@@ -85,6 +101,10 @@ export class ARExperience {
 
   public stop(): void {
     this.isRunning = false;
+    if (this.lostGraceTimeout !== null) {
+      window.clearTimeout(this.lostGraceTimeout);
+      this.lostGraceTimeout = null;
+    }
     if (this.renderer) {
       this.renderer.setAnimationLoop(null);
     }

@@ -252,16 +252,37 @@ html, body {
   transform: translateY(0);
 }
 
+.primary-btn-sm {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 18px;
+  background: linear-gradient(135deg, #00d2ff 0%, #0077ff 100%);
+  color: #ffffff;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.primary-btn-sm:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(0, 119, 255, 0.4);
+}
+
 .secondary-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 12px 20px;
+  padding: 10px 18px;
   background: rgba(255, 255, 255, 0.08);
   color: var(--text-primary);
   border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  font-size: 14px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
   font-weight: 600;
   text-decoration: none;
   cursor: pointer;
@@ -303,15 +324,8 @@ html, body {
   border: 2px solid rgba(0, 229, 255, 0.25);
 }
 
-.radar-ring.r1 {
-  width: 100%;
-  height: 100%;
-}
-
-.radar-ring.r2 {
-  width: 60%;
-  height: 60%;
-}
+.radar-ring.r1 { width: 100%; height: 100%; }
+.radar-ring.r2 { width: 60%; height: 60%; }
 
 .radar-core {
   width: 12px;
@@ -342,10 +356,10 @@ html, body {
   font-family: var(--font-mono);
 }
 
-/* 3. AR Active HUD & Reticle */
+/* 3. AR Active HUD (EDGE-TO-EDGE FULL SCREEN SCANNING) */
 .ui-screen-active {
   justify-content: space-between;
-  padding: 20px;
+  padding: 16px;
   pointer-events: none;
 }
 
@@ -355,6 +369,7 @@ html, body {
   align-items: center;
   justify-content: space-between;
   pointer-events: auto;
+  z-index: 20;
 }
 
 .tracking-pill {
@@ -367,7 +382,7 @@ html, body {
   border: 1px solid var(--border-subtle);
   border-radius: 999px;
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
   transition: all 0.3s ease;
@@ -408,8 +423,8 @@ html, body {
 }
 
 .icon-btn {
-  width: 44px;
-  height: 44px;
+  width: 42px;
+  height: 42px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -426,72 +441,75 @@ html, body {
   background: rgba(255, 255, 255, 0.15);
 }
 
-/* Viewfinder Reticle */
-.viewfinder-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
+/* Edge-to-Edge Full Screen HUD Frame */
+.fullscreen-scan-frame {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  right: 14px;
+  bottom: 14px;
+  border: 1px solid rgba(0, 229, 255, 0.15);
+  border-radius: 20px;
   pointer-events: none;
-}
-
-.reticle-box {
-  position: relative;
-  width: 250px;
-  height: 250px;
-  max-width: 75vw;
-  max-height: 75vw;
-  border: 1px dashed rgba(255, 255, 255, 0.2);
-  border-radius: 16px;
   transition: all 0.3s ease;
 }
 
-.tracking-locked .reticle-box {
-  border: 1px solid rgba(0, 230, 118, 0.4);
-  background: rgba(0, 230, 118, 0.04);
+.tracking-locked.fullscreen-scan-frame {
+  border-color: rgba(0, 230, 118, 0.3);
 }
 
-.corner {
+.fs-corner {
   position: absolute;
-  width: 28px;
-  height: 28px;
+  width: 44px;
+  height: 44px;
   border-color: var(--accent-cyan);
   border-style: solid;
   transition: border-color 0.3s ease;
 }
 
-.tracking-locked .corner {
+.tracking-locked .fs-corner {
   border-color: var(--accent-green);
 }
 
-.corner-tl { top: -2px; left: -2px; border-width: 3px 0 0 3px; border-top-left-radius: 12px; }
-.corner-tr { top: -2px; right: -2px; border-width: 3px 3px 0 0; border-top-right-radius: 12px; }
-.corner-bl { bottom: -2px; left: -2px; border-width: 0 0 3px 3px; border-bottom-left-radius: 12px; }
-.corner-br { bottom: -2px; right: -2px; border-width: 0 3px 3px 0; border-bottom-right-radius: 12px; }
+.fs-corner-tl { top: -2px; left: -2px; border-width: 4px 0 0 4px; border-top-left-radius: 20px; }
+.fs-corner-tr { top: -2px; right: -2px; border-width: 4px 4px 0 0; border-top-right-radius: 20px; }
+.fs-corner-bl { bottom: -2px; left: -2px; border-width: 0 0 4px 4px; border-bottom-left-radius: 20px; }
+.fs-corner-br { bottom: -2px; right: -2px; border-width: 0 4px 4px 0; border-bottom-right-radius: 20px; }
 
-.scan-beam {
+.fullscreen-scan-beam {
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
-  height: 2px;
+  height: 3px;
   background: linear-gradient(90deg, transparent 0%, var(--accent-cyan) 50%, transparent 100%);
-  box-shadow: 0 0 12px var(--accent-cyan);
-  animation: scanMotion 2.2s ease-in-out infinite alternate;
+  box-shadow: 0 0 16px var(--accent-cyan);
+  animation: scanMotion 3s ease-in-out infinite alternate;
 }
 
-.tracking-locked .scan-beam {
+.tracking-locked .fullscreen-scan-beam {
   display: none;
 }
 
+.bottom-hud-bar {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  pointer-events: auto;
+  z-index: 20;
+}
+
 .viewfinder-hint {
-  padding: 6px 14px;
-  background: rgba(0, 0, 0, 0.65);
+  padding: 8px 18px;
+  background: rgba(0, 0, 0, 0.75);
   backdrop-filter: blur(8px);
   border-radius: 999px;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
   color: var(--text-secondary);
+  text-align: center;
 }
 
 .mini-target-badge {
@@ -557,7 +575,7 @@ html, body {
   line-height: 1.4;
 }
 
-/* 5. Poster Modal */
+/* 5. Poster Modal (Supports Fullscreen on Laptop) */
 .poster-modal {
   position: absolute;
   top: 0;
@@ -578,20 +596,43 @@ html, body {
   left: 0;
   width: 100%;
   height: 100%;
-  background: rgba(0, 0, 0, 0.75);
-  backdrop-filter: blur(8px);
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(12px);
 }
 
 .poster-modal-content {
   position: relative;
   z-index: 2;
   width: 100%;
-  max-width: 440px;
-  max-height: 90dvh;
+  max-width: 580px;
+  max-height: 92dvh;
   display: flex;
   flex-direction: column;
   padding: 24px;
   gap: 16px;
+}
+
+.poster-modal-content:fullscreen {
+  max-width: 100vw;
+  max-height: 100vh;
+  width: 100vw;
+  height: 100vh;
+  border-radius: 0;
+  background: #000000;
+  align-items: center;
+  justify-content: center;
+}
+
+.poster-modal-content:fullscreen .full-poster-wrapper {
+  max-height: 85vh;
+  width: auto;
+  aspect-ratio: 1 / 1;
+}
+
+.poster-modal-content:fullscreen .full-poster-wrapper img {
+  height: 85vh;
+  width: 85vh;
+  object-fit: contain;
 }
 
 .modal-header {
@@ -618,14 +659,17 @@ html, body {
   overflow-y: auto;
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 12px;
 }
 
 .full-poster-wrapper {
   width: 100%;
+  max-width: 440px;
   border-radius: var(--radius-sm);
   overflow: hidden;
   border: 1px solid var(--border-subtle);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
 }
 
 .full-poster-wrapper img {
@@ -636,7 +680,10 @@ html, body {
 
 .modal-footer {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 /* Keyframes */
