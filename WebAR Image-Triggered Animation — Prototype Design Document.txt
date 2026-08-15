@@ -1,0 +1,939 @@
+# WebAR Image-Triggered Animation — Prototype Design Document
+
+## 1. Prototype Objective
+
+Build a **fully functional, free/open-source WebAR prototype** where:
+
+```text
+User enters URL
+      ↓
+Web page opens
+      ↓
+Camera permission
+      ↓
+User points camera at sample poster
+      ↓
+MindAR recognizes poster
+      ↓
+Three.js places animation on poster
+      ↓
+Animation starts automatically
+```
+
+The prototype should validate the **complete pipeline**, not just demonstrate AR tracking.
+
+---
+
+# 2. Technology Stack
+
+| Layer             | Technology                   | Role                               |
+| ----------------- | ---------------------------- | ---------------------------------- |
+| Language          | TypeScript                   | Application code                   |
+| Build tool        | Vite                         | Development/build pipeline         |
+| AR                | MindAR                       | Image recognition + tracking       |
+| 3D                | Three.js                     | Rendering                          |
+| 3D asset          | GLB/GLTF                     | Sample animated object             |
+| Asset creation    | Blender                      | Optional custom animation creation |
+| Target generation | MindAR Image Target Compiler | Convert poster into `.mind` target |
+| Hosting           | GitHub Pages                 | Free deployment                    |
+| Version control   | Git + GitHub                 | Source code                        |
+
+All core software is open source.
+
+---
+
+# 3. Prototype Scope
+
+### Included
+
+* One URL
+* One sample poster
+* One image target
+* One sample animation
+* Camera permission
+* Image detection
+* AR tracking
+* Animation playback
+* Animation follows poster movement
+* Basic loading/error states
+* Mobile browser support
+* Production build
+* Deployment to a public URL
+
+### Not included
+
+* User accounts
+* Database
+* CMS
+* Admin panel
+* Payments
+* Multiple users
+* Analytics
+* Content uploading
+* Authentication
+* Native mobile application
+* Multiplayer
+* Advanced interaction
+
+The objective is to prove the **core technical pipeline** first.
+
+---
+
+# 4. User Experience
+
+## Initial screen
+
+```text
+┌──────────────────────────────┐
+│                              │
+│          WEBAR               │
+│                              │
+│   Scan the poster to begin   │
+│                              │
+│                              │
+│       [ START CAMERA ]       │
+│                              │
+└──────────────────────────────┘
+```
+
+User presses:
+
+**START CAMERA**
+
+Browser requests camera permission.
+
+---
+
+## Camera state
+
+```text
+┌──────────────────────────────┐
+│                              │
+│      CAMERA PREVIEW          │
+│                              │
+│                              │
+│       ┌──────────────┐       │
+│       │              │       │
+│       │ SCAN POSTER  │       │
+│       │              │       │
+│       └──────────────┘       │
+│                              │
+│   Point your camera here     │
+└──────────────────────────────┘
+```
+
+---
+
+## Target detected
+
+When MindAR detects the poster:
+
+```text
+              ★
+             / \
+            /   \
+       ┌──────────────┐
+       │   POSTER     │
+       │              │
+       └──────────────┘
+              ↑
+          animation
+```
+
+The animation automatically starts.
+
+No additional user interaction is required.
+
+---
+
+# 5. Technical Architecture
+
+```text
+                    BROWSER
+                       │
+                       ▼
+              ┌─────────────────┐
+              │   Vite App      │
+              │   TypeScript    │
+              └────────┬────────┘
+                       │
+                       ▼
+              ┌─────────────────┐
+              │     MindAR      │
+              │ Image Tracking  │
+              └────────┬────────┘
+                       │
+                  Camera frames
+                       │
+                       ▼
+              ┌─────────────────┐
+              │ Poster detected │
+              └────────┬────────┘
+                       │
+                       ▼
+              ┌─────────────────┐
+              │    Three.js     │
+              │     Scene       │
+              └────────┬────────┘
+                       │
+                       ▼
+                Sample GLB
+                 animation
+                       │
+                       ▼
+              Browser WebGL
+                       │
+                       ▼
+                 AR output
+```
+
+---
+
+# 6. Project Structure
+
+```text
+webar-prototype/
+│
+├── public/
+│   │
+│   ├── targets/
+│   │   └── sample-poster.mind
+│   │
+│   └── models/
+│       └── sample-animation.glb
+│
+├── src/
+│   │
+│   ├── main.ts
+│   │
+│   ├── ar/
+│   │   ├── ARExperience.ts
+│   │   ├── TargetTracker.ts
+│   │   └── AnimationController.ts
+│   │
+│   ├── ui/
+│   │   └── UIController.ts
+│   │
+│   └── config/
+│       └── experience.ts
+│
+├── index.html
+├── package.json
+├── tsconfig.json
+├── vite.config.ts
+└── README.md
+```
+
+---
+
+# 7. Core Runtime
+
+The application has five major systems.
+
+```text
+┌─────────────────────────┐
+│       ARExperience      │
+└────────────┬────────────┘
+             │
+       ┌─────┴──────┐
+       ▼            ▼
+ TargetTracker   AnimationController
+       │            │
+       │            │
+       ▼            ▼
+    MindAR       Three.js
+       │            │
+       └─────┬──────┘
+             ▼
+        AR Experience
+```
+
+---
+
+# 8. TargetTracker
+
+Responsible for:
+
+* Starting MindAR
+* Accessing camera
+* Loading `.mind`
+* Detecting target
+* Tracking target
+* Detecting target lost
+* Sending tracking events
+
+Conceptually:
+
+```typescript
+targetFound()
+targetLost()
+```
+
+The rest of the application should not need to know how MindAR works internally.
+
+---
+
+# 9. AnimationController
+
+Responsible for:
+
+* Loading GLB
+* Creating Three.js object
+* Positioning it relative to target
+* Playing animation
+* Pausing animation
+* Resetting animation
+
+Conceptual lifecycle:
+
+```text
+GLB loaded
+    ↓
+Scene created
+    ↓
+Target detected
+    ↓
+Animation object enabled
+    ↓
+Animation.play()
+```
+
+When the target disappears:
+
+```text
+Target lost
+    ↓
+Animation paused/hidden
+```
+
+---
+
+# 10. AR Coordinate System
+
+This is one of the most important parts.
+
+MindAR creates an anchor associated with the detected image.
+
+Conceptually:
+
+```text
+              Y
+              ↑
+              │
+              │
+              ●────────→ X
+             /
+            /
+           Z
+
+      IMAGE TARGET
+```
+
+The Three.js animation becomes a child of the target anchor.
+
+Therefore:
+
+```text
+Poster moves
+     ↓
+Target anchor moves
+     ↓
+Three.js object moves
+     ↓
+Animation remains attached
+```
+
+This is what makes it AR rather than simply putting an animation over the camera feed.
+
+---
+
+# 11. Sample Assets
+
+For the first prototype, don't create custom artwork.
+
+Use:
+
+### Target
+
+A visually rich sample poster:
+
+```text
+sample-poster.jpg
+```
+
+Prefer an image containing:
+
+* text
+* objects
+* edges
+* high-frequency details
+* distinctive shapes
+
+Avoid:
+
+```text
+plain white poster
+simple logo
+large flat color
+```
+
+because image tracking needs recognizable visual features.
+
+---
+
+### Animation
+
+Use a simple animated GLB:
+
+```text
+sample-animation.glb
+```
+
+For example:
+
+```text
+floating robot
+```
+
+with:
+
+```text
+Idle animation
+   ↓
+Target detected
+   ↓
+Robot appears
+   ↓
+Robot performs animation
+```
+
+The actual model is not important at this stage.
+
+---
+
+# 12. Target Generation
+
+Pipeline:
+
+```text
+sample-poster.jpg
+        │
+        ▼
+MindAR Image Target Compiler
+        │
+        ▼
+sample-poster.mind
+```
+
+The `.mind` file is then placed into:
+
+```text
+public/targets/
+```
+
+The application loads:
+
+```text
+/targets/sample-poster.mind
+```
+
+---
+
+# 13. Animation Pipeline
+
+For the prototype:
+
+```text
+Blender
+   │
+   │ create/import animation
+   ▼
+Animated model
+   │
+   ▼
+Export GLB
+   │
+   ▼
+sample-animation.glb
+   │
+   ▼
+public/models/
+```
+
+Three.js loads the GLB using `GLTFLoader`.
+
+If the GLB contains animation clips:
+
+```text
+GLTF
+ ├── Scene
+ ├── Meshes
+ ├── Materials
+ └── AnimationClips
+```
+
+Three.js `AnimationMixer` controls playback.
+
+---
+
+# 14. Application State Machine
+
+Keep the prototype state-driven.
+
+```text
+         ┌─────────────┐
+         │    IDLE     │
+         └──────┬──────┘
+                │
+          Start Camera
+                │
+                ▼
+         ┌─────────────┐
+         │  STARTING   │
+         └──────┬──────┘
+                │
+                ▼
+         ┌─────────────┐
+         │   SCANNING  │
+         └──────┬──────┘
+                │
+          Target Found
+                │
+                ▼
+         ┌─────────────┐
+         │  TRACKING   │
+         │             │
+         │ Animation   │
+         │   playing   │
+         └──────┬──────┘
+                │
+           Target Lost
+                │
+                ▼
+         ┌─────────────┐
+         │   SCANNING  │
+         └─────────────┘
+```
+
+---
+
+# 15. URL Design
+
+For the prototype:
+
+```text
+https://your-domain.com/
+```
+
+is enough.
+
+But structure the application so it can eventually support:
+
+```text
+https://your-domain.com/ar/demo
+```
+
+and eventually:
+
+```text
+https://your-domain.com/ar/{experienceId}
+```
+
+For example:
+
+```text
+/ar/rocket
+```
+
+could eventually load:
+
+```text
+rocket.mind
+rocket.glb
+```
+
+while:
+
+```text
+/ar/car
+```
+
+loads:
+
+```text
+car.mind
+car.glb
+```
+
+---
+
+# 16. Future Content Architecture
+
+Do **not** implement this in the prototype, but design toward it.
+
+Eventually:
+
+```text
+                    URL
+                     │
+                     ▼
+              Experience ID
+                     │
+                     ▼
+              Experience Config
+                     │
+          ┌──────────┴──────────┐
+          ▼                     ▼
+      Image Target          Animation
+          │                     │
+          ▼                     ▼
+       poster.mind            model.glb
+```
+
+Example:
+
+```json
+{
+  "id": "rocket",
+  "target": "/targets/rocket.mind",
+  "animation": "/models/rocket.glb"
+}
+```
+
+This would allow you to create thousands of experiences without changing the AR application itself.
+
+---
+
+# 17. Loading UX
+
+Mobile WebAR can take several seconds to initialize.
+
+Therefore:
+
+```text
+Loading application...
+        ↓
+Loading AR engine...
+        ↓
+Loading target...
+        ↓
+Loading animation...
+        ↓
+Starting camera...
+        ↓
+Ready
+```
+
+Don't show an empty camera screen.
+
+Use a simple status indicator:
+
+```text
+Loading AR experience...
+```
+
+Then:
+
+```text
+Point your camera at the poster
+```
+
+---
+
+# 18. Error Handling
+
+The prototype should handle at least:
+
+### Camera denied
+
+```text
+Camera access is required for this AR experience.
+Please enable camera permission in your browser.
+```
+
+### Unsupported browser
+
+```text
+This AR experience requires a modern mobile browser.
+```
+
+### Target not detected
+
+Don't show an error immediately.
+
+Instead:
+
+```text
+Looking for the poster...
+```
+
+### Target lost
+
+```text
+Poster lost
+Point the camera back at the poster.
+```
+
+---
+
+# 19. Performance Requirements
+
+Target:
+
+**60 FPS on a reasonably modern phone**, but the prototype should prioritize stability over visual complexity.
+
+Keep the first GLB:
+
+* Low polygon count
+* Small texture sizes
+* Minimal materials
+* Small file size
+* One animation
+
+Avoid initially:
+
+* 4K textures
+* complex shaders
+* large environments
+* expensive post-processing
+* multiple animated characters
+* heavy particle systems
+
+A WebAR experience is constrained by the user's **mobile browser + camera + GPU**, so asset optimization matters significantly.
+
+---
+
+# 20. Development Phases
+
+## Phase 1 — Basic Web App
+
+```text
+Vite
+ ↓
+TypeScript
+ ↓
+Basic webpage
+```
+
+Verify:
+
+* npm install
+* npm run dev
+* browser opens
+
+---
+
+## Phase 2 — Three.js
+
+Add:
+
+```text
+Three.js
+```
+
+Create:
+
+```text
+Scene
+Camera
+Renderer
+Light
+Object
+```
+
+Verify the sample 3D model renders normally.
+
+---
+
+## Phase 3 — MindAR
+
+Add:
+
+```text
+MindAR
+```
+
+Create image target:
+
+```text
+poster.jpg
+ ↓
+poster.mind
+```
+
+Verify:
+
+```text
+Camera
+ ↓
+Poster detected
+ ↓
+Target tracking
+```
+
+---
+
+## Phase 4 — Combine MindAR + Three.js
+
+```text
+MindAR target
+       ↓
+Three.js anchor
+       ↓
+GLB model
+```
+
+Verify that moving the physical poster causes the virtual object to move with it.
+
+---
+
+## Phase 5 — Animation
+
+Add:
+
+```text
+GLB
+ ↓
+AnimationMixer
+ ↓
+AnimationClip.play()
+```
+
+Verify:
+
+```text
+Target detected
+       ↓
+Animation starts
+```
+
+---
+
+## Phase 6 — UX
+
+Add:
+
+* Start button
+* Loading screen
+* Scan instructions
+* Target-found state
+* Target-lost state
+* Error messages
+
+---
+
+## Phase 7 — Production Build
+
+```text
+npm run build
+```
+
+Generate:
+
+```text
+dist/
+```
+
+Deploy `dist/` to GitHub Pages or another free static host.
+
+---
+
+# 21. Final Prototype Test
+
+The prototype is considered successful if you can perform this exact test:
+
+```text
+1. Open the public URL on Android Chrome
+             ↓
+2. Grant camera permission
+             ↓
+3. See camera feed
+             ↓
+4. Hold sample poster in front of camera
+             ↓
+5. MindAR recognizes poster
+             ↓
+6. Sample 3D animation appears
+             ↓
+7. Move poster
+             ↓
+8. Animation follows poster
+             ↓
+9. Hide poster
+             ↓
+10. Animation disappears/pauses
+             ↓
+11. Show poster again
+             ↓
+12. Animation resumes
+```
+
+If all 12 work, **the core product concept is technically validated.**
+
+---
+
+# 22. Final Architecture
+
+```text
+                         ┌───────────────┐
+                         │     USER      │
+                         └───────┬───────┘
+                                 │
+                              URL / QR
+                                 │
+                                 ▼
+                     ┌──────────────────────┐
+                     │    Vite Web App      │
+                     │    TypeScript        │
+                     └──────────┬───────────┘
+                                │
+                                ▼
+                     ┌──────────────────────┐
+                     │       MindAR         │
+                     │   Image Tracking     │
+                     └──────────┬───────────┘
+                                │
+                           Camera Feed
+                                │
+                                ▼
+                     ┌──────────────────────┐
+                     │    Image Target      │
+                     │   poster.mind        │
+                     └──────────┬───────────┘
+                                │
+                         Target detected
+                                │
+                                ▼
+                     ┌──────────────────────┐
+                     │      Three.js        │
+                     │    AR Rendering      │
+                     └──────────┬───────────┘
+                                │
+                                ▼
+                     ┌──────────────────────┐
+                     │      Sample GLB      │
+                     │      Animation       │
+                     └──────────┬───────────┘
+                                │
+                                ▼
+                         ┌────────────┐
+                         │ AR OUTPUT  │
+                         └────────────┘
+
+
+ DEVELOPMENT                    DEPLOYMENT
+
+ Blender ──→ GLB                   Git
+                                  ↓
+ Poster ──→ MindAR Target ──→ GitHub
+                                  ↓
+                            GitHub Pages
+                                  ↓
+                              Public URL
+```
+
+## The prototype's core stack
+
+**Vite + TypeScript + MindAR + Three.js + GLB/GLTF + Blender + GitHub Pages**
+
+That is the smallest architecture I would use to prove the complete idea without introducing a backend or paid AR platform.
