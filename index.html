@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#080c14" />
+    <meta name="description" content="WebAR Image-Triggered Animation Prototype powered by MindAR and Three.js" />
+    <title>WebAR Poster Experience</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2300e5ff'><circle cx='12' cy='12' r='10'/></svg>" />
+
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "./libs/three.module.js",
+          "three/addons/renderers/CSS3DRenderer.js": "./libs/CSS3DRenderer.js"
+        }
+      }
+    </script>
+    <script type="module" crossorigin src="./assets/index-Ch6-e6pH.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-Bc7ro1VY.css">
+  </head>
+  <body>
+    <div id="app">
+      <!-- 3D WebGL / Camera Feed Container -->
+      <div id="ar-container"></div>
+      
+      <!-- Interactive UI Overlay Container -->
+      <div id="ui-container"></div>
+    </div>
+  </body>
+</html>
