@@ -1,0 +1,23 @@
+{
+  "imagePath": "./targets/sample-poster_luminance.jpg",
+  "metadata": null,
+  "name": "sample-poster",
+  "type": "PLANAR",
+  "properties": {
+    "left": 0,
+    "top": 0,
+    "width": 1024,
+    "height": 1024,
+    "isRotated": false,
+    "originalWidth": 1024,
+    "originalHeight": 1024
+  },
+  "resources": {
+    "originalImage": "./targets/sample-poster_original.jpg",
+    "croppedImage": "./targets/sample-poster_cropped.jpg",
+    "thumbnailImage": "./targets/sample-poster_thumbnail.jpg",
+    "luminanceImage": "./targets/sample-poster_luminance.jpg"
+  },
+  "created": 1786791361046,
+  "updated": 1786791361046
+}
