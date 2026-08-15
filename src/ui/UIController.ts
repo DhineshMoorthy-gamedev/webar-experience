@@ -178,12 +178,16 @@ export class UIController {
       <div class="poster-modal" id="poster-modal" style="display: none;">
         <div class="poster-modal-backdrop" id="poster-modal-backdrop"></div>
         <div class="poster-modal-content glass-panel" id="poster-modal-content">
+          <!-- Floating Exit Button in Maximized Mode -->
+          <button class="exit-maximized-btn" id="btn-exit-maximized-poster">
+            ✕ Exit Fullscreen
+          </button>
           <div class="modal-header">
             <h3>Sample AR Target Poster</h3>
             <button class="close-btn" id="btn-close-poster-modal">✕</button>
           </div>
           <div class="modal-body">
-            <p>Display this poster on your laptop or print it for testing:</p>
+            <p class="modal-hint">Display this poster on your laptop or print it for testing:</p>
             <div class="full-poster-wrapper" id="poster-display-box">
               <img src="${this.config.posterImageSrc}" alt="AR Sample Poster" />
             </div>
@@ -245,24 +249,65 @@ export class UIController {
     closeModalBtn?.addEventListener('click', () => this.showPosterModal(false));
 
     const backdrop = this.rootElement.querySelector('#poster-modal-backdrop');
-    backdrop?.addEventListener('click', () => this.showPosterModal(false));
+    backdrop?.addEventListener('click', () => {
+      if (this.posterModalElement?.classList.contains('is-maximized')) {
+        this.toggleMaximizePoster(false);
+      } else {
+        this.showPosterModal(false);
+      }
+    });
 
-    // Fullscreen presentation toggle
+    // Universal Dual-Engine Fullscreen Presentation Toggle
     const fsBtn = this.rootElement.querySelector('#btn-toggle-fullscreen-poster');
-    fsBtn?.addEventListener('click', () => {
-      const modalBox = this.rootElement.querySelector('#poster-modal-content');
-      if (modalBox) {
-        if (!document.fullscreenElement) {
-          modalBox.requestFullscreen().catch(() => {});
-        } else {
-          document.exitFullscreen().catch(() => {});
-        }
+    fsBtn?.addEventListener('click', () => this.toggleMaximizePoster(true));
+
+    const exitFsBtn = this.rootElement.querySelector('#btn-exit-maximized-poster');
+    exitFsBtn?.addEventListener('click', () => this.toggleMaximizePoster(false));
+
+    // Listen for browser native fullscreen changes
+    document.addEventListener('fullscreenchange', () => {
+      if (!document.fullscreenElement && this.posterModalElement?.classList.contains('is-maximized')) {
+        this.toggleMaximizePoster(false, false);
+      }
+    });
+
+    // Keyboard ESC to exit
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && this.posterModalElement?.classList.contains('is-maximized')) {
+        this.toggleMaximizePoster(false);
       }
     });
   }
 
+  private toggleMaximizePoster(maximize: boolean, syncNative = true): void {
+    if (!this.posterModalElement) return;
+
+    if (maximize) {
+      this.posterModalElement.classList.add('is-maximized');
+      if (syncNative) {
+        const el = this.posterModalElement as any;
+        const requestFS = el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen || el.msRequestFullscreen;
+        if (typeof requestFS === 'function') {
+          requestFS.call(el).catch(() => {});
+        }
+      }
+    } else {
+      this.posterModalElement.classList.remove('is-maximized');
+      if (syncNative && document.fullscreenElement) {
+        const doc = document as any;
+        const exitFS = doc.exitFullscreen || doc.webkitExitFullscreen || doc.mozCancelFullScreen || doc.msExitFullscreen;
+        if (typeof exitFS === 'function') {
+          exitFS.call(doc).catch(() => {});
+        }
+      }
+    }
+  }
+
   private showPosterModal(show: boolean): void {
     if (this.posterModalElement) {
+      if (!show) {
+        this.toggleMaximizePoster(false);
+      }
       this.posterModalElement.style.display = show ? 'flex' : 'none';
     }
   }
