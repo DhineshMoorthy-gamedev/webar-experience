@@ -167,6 +167,9 @@ export class TargetTracker {
       throw new Error('8th Wall XR8 engine not loaded.');
     }
 
+    // Ensure canvas is visible for active camera rendering
+    this.canvasElement.style.display = 'block';
+
     const anyDevice = XR8.XrConfig.device().ANY;
 
     try {
@@ -191,6 +194,32 @@ export class TargetTracker {
         console.warn('XR8 stop warning:', e);
       }
       this.isTracking = false;
+    }
+
+    // Stop all media stream camera tracks and release hardware camera lock
+    try {
+      document.querySelectorAll('video').forEach((video) => {
+        if (video.srcObject) {
+          const stream = video.srcObject as MediaStream;
+          stream.getTracks().forEach((track) => track.stop());
+          video.srcObject = null;
+        }
+        video.remove();
+      });
+    } catch (e) {
+      console.warn('Camera track cleanup warning:', e);
+    }
+
+    // Hide canvas and clear WebGL context so frozen frame does not persist
+    if (this.canvasElement) {
+      this.canvasElement.style.display = 'none';
+      try {
+        const gl = this.canvasElement.getContext('webgl2') || this.canvasElement.getContext('webgl');
+        if (gl) {
+          gl.clearColor(0, 0, 0, 0);
+          gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+        }
+      } catch (e) {}
     }
   }
 
