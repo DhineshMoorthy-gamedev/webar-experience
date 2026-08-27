@@ -1,0 +1,23 @@
+{
+  "imagePath": "image-targets/business-card_luminance.jpg",
+  "metadata": null,
+  "name": "business-card",
+  "type": "PLANAR",
+  "properties": {
+    "left": 0,
+    "top": 250,
+    "width": 1200,
+    "height": 1600,
+    "isRotated": true,
+    "originalWidth": 1200,
+    "originalHeight": 2100
+  },
+  "resources": {
+    "originalImage": "business-card_original.jpg",
+    "croppedImage": "business-card_cropped.jpg",
+    "thumbnailImage": "business-card_thumbnail.jpg",
+    "luminanceImage": "business-card_luminance.jpg"
+  },
+  "created": 1787813039243,
+  "updated": 1787813039243
+}

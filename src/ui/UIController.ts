@@ -1,171 +1,206 @@
 import { ExperienceConfig } from '../config/experience.ts';
+import { ProjectItem } from '../config/portfolio.ts';
 
-export type AppState = 'IDLE' | 'STARTING' | 'SCANNING' | 'TRACKING' | 'ERROR';
-
-export interface UIControllerCallbacks {
+export interface UICallbacks {
   onStartRequested: () => Promise<void>;
   onStopRequested: () => void;
-  onRestartRequested: () => void;
+  onRestartRequested: () => Promise<void>;
+  onMilestoneSelected?: (index: number) => void;
 }
 
+export type UIState = 'IDLE' | 'STARTING' | 'SCANNING' | 'TRACKING' | 'ERROR';
+
 export class UIController {
-  private currentState: AppState = 'IDLE';
-  private rootElement: HTMLElement;
+  private currentState: UIState = 'IDLE';
   private statusTextElement: HTMLElement | null = null;
   private errorDetailElement: HTMLElement | null = null;
   private posterModalElement: HTMLElement | null = null;
+  private projectDetailsModalElement: HTMLElement | null = null;
+  
+  // Timeline State
+  private currentMilestoneIndex = 0;
+  private isAutoPlaying = false;
+  private autoPlayTimer: number | null = null;
+  private readonly AUTO_PLAY_INTERVAL_MS = 5000;
 
   constructor(
-    private container: HTMLElement,
+    private rootElement: HTMLElement,
     private config: ExperienceConfig,
-    private callbacks: UIControllerCallbacks
+    private callbacks: UICallbacks
   ) {
-    this.rootElement = document.createElement('div');
-    this.rootElement.className = 'webar-ui-root';
-    this.container.appendChild(this.rootElement);
     this.render();
   }
 
-  public setState(state: AppState, statusMessage?: string): void {
+  public setState(state: UIState, message?: string): void {
     this.currentState = state;
     this.updateStateView();
-    if (statusMessage) {
-      this.setStatusMessage(statusMessage);
+
+    if (message && this.statusTextElement) {
+      this.statusTextElement.textContent = message;
+    }
+
+    if (state === 'TRACKING') {
+      this.updateActiveMilestoneUI();
     }
   }
 
-  public getState(): AppState {
-    return this.currentState;
-  }
-
-  public setStatusMessage(msg: string): void {
+  public setStatusMessage(message: string): void {
     if (this.statusTextElement) {
-      this.statusTextElement.textContent = msg;
+      this.statusTextElement.textContent = message;
+    }
+    const hudStatus = this.rootElement.querySelector('#hud-status-text');
+    if (hudStatus) {
+      hudStatus.textContent = message;
     }
   }
 
   public setError(title: string, detail: string): void {
-    this.setState('ERROR');
-    const titleEl = this.rootElement.querySelector('.error-title');
-    if (titleEl) titleEl.textContent = title;
+    this.currentState = 'ERROR';
+    this.updateStateView();
+
+    const errTitle = this.rootElement.querySelector('#error-title-text');
+    if (errTitle) errTitle.textContent = title;
     if (this.errorDetailElement) this.errorDetailElement.textContent = detail;
   }
 
   private render(): void {
+    const portfolio = this.config.portfolio;
+    const milestones = portfolio.milestones;
+
     this.rootElement.innerHTML = `
-      <!-- 1. IDLE Screen -->
-      <section class="ui-screen ui-screen-idle" id="screen-idle">
-        <div class="idle-card glass-panel">
-          <div class="brand-badge">
-            <span class="badge-dot"></span>
-            <span>WebAR Engine v1.0</span>
+      <!-- 1. Idle Hero View: Game Dev Portfolio Greeting -->
+      <section class="ui-screen" id="screen-idle">
+        <div class="glass-panel hero-card">
+          <div class="hero-header">
+            <div class="badge-pill">🚀 WebAR Portfolio</div>
+            <div class="live-dot-container">
+              <span class="live-dot"></span>
+              <span class="live-text">8th Wall CV</span>
+            </div>
           </div>
           
-          <h1 class="main-title">${this.config.title}</h1>
-          <p class="main-desc">${this.config.description}</p>
+          <h1 class="hero-title">${portfolio.developerName}</h1>
+          <p class="hero-role">${portfolio.title} • <span class="highlight-studio">${portfolio.studio}</span></p>
+          <p class="hero-subtitle">${portfolio.tagline}</p>
 
-          <div class="poster-preview-card" id="btn-open-poster-preview">
-            <div class="preview-thumbnail">
-              <img src="${this.config.posterImageSrc}" alt="Target Poster Preview" />
+          <div class="featured-game-chip" id="btn-hero-zen-fourier">
+            <span class="chip-icon">🌌</span>
+            <div class="chip-text">
+              <span class="chip-label">FLAGSHIP INDIE TITLE</span>
+              <span class="chip-title">${portfolio.flagshipGame}</span>
             </div>
-            <div class="preview-meta">
-              <span class="preview-label">Target Poster</span>
-              <span class="preview-name">sample-poster.jpg</span>
-              <span class="preview-hint">Tap to view / present on laptop</span>
-            </div>
+            <span class="chip-arrow">➔</span>
           </div>
 
-          <div class="action-section">
-            <button class="primary-btn" id="btn-start-camera">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
-                <circle cx="12" cy="13" r="4"></circle>
-              </svg>
-              <span>START CAMERA</span>
+          <div class="hero-actions">
+            <button class="primary-btn pulse" id="btn-start-camera">
+              <span class="btn-icon">📷</span>
+              <span>LAUNCH AR PORTFOLIO</span>
             </button>
-            <p class="permission-notice">Requires camera access to detect and track the AR poster.</p>
+            <button class="secondary-btn" id="btn-open-poster-preview">
+              <span class="btn-icon">🪪</span>
+              <span>View Business Card Target</span>
+            </button>
+          </div>
+
+          <div class="social-bar">
+            <a href="${portfolio.socials.github}" target="_blank" rel="noopener" class="social-btn" title="GitHub">
+              <span>🐙 GitHub</span>
+            </a>
+            <a href="${portfolio.socials.linkedin}" target="_blank" rel="noopener" class="social-btn" title="LinkedIn">
+              <span>💼 LinkedIn</span>
+            </a>
+            <a href="${portfolio.socials.email}" class="social-btn" title="Email">
+              <span>✉️ Contact</span>
+            </a>
           </div>
         </div>
       </section>
 
-      <!-- 2. STARTING / Loading Screen -->
-      <section class="ui-screen ui-screen-starting" id="screen-starting">
-        <div class="loading-card glass-panel">
-          <div class="radar-spinner">
-            <div class="radar-ring r1"></div>
-            <div class="radar-ring r2"></div>
-            <div class="radar-core"></div>
-            <div class="radar-sweep"></div>
-          </div>
-          <h2 class="loading-title">Initializing Experience</h2>
-          <p class="loading-status" id="loading-status-text">Loading HD Camera & AR Engine...</p>
+      <!-- 2. Starting / Initializing View -->
+      <section class="ui-screen" id="screen-starting" style="display: none;">
+        <div class="glass-panel status-card">
+          <div class="spinner-ring"></div>
+          <h3>Initializing AR Hologram...</h3>
+          <p id="loading-status-text">Accessing camera and loading 3D assets...</p>
         </div>
       </section>
 
-      <!-- 3. Active AR Viewfinder & Overlay (FULL SCREEN EDGE-TO-EDGE) -->
-      <section class="ui-screen ui-screen-active" id="screen-active">
-        <!-- Top Navigation / Status Header -->
-        <header class="ar-hud-header">
-          <div class="tracking-pill" id="tracking-status-pill">
-            <span class="pill-beacon"></span>
-            <span class="pill-text" id="hud-status-text">Scanning full screen for poster...</span>
+      <!-- 3. Active Scanning & Tracking HUD Overlay -->
+      <section class="ui-screen" id="screen-active" style="display: none;">
+        <!-- Top Navigation Bar -->
+        <header class="hud-top-bar">
+          <div class="hud-pill" id="tracking-status-pill">
+            <span class="status-indicator"></span>
+            <span id="hud-status-text">Scanning for Card...</span>
           </div>
 
-          <div class="hud-actions">
-            <button class="icon-btn" id="btn-show-target-hud" title="View Target Poster">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                <polyline points="21 15 16 10 5 21"></polyline>
-              </svg>
+          <div class="hud-right-actions">
+            <button class="icon-btn-glass" id="btn-show-target-hud" title="Show Target Card">
+              🪪 Target
             </button>
-            <button class="icon-btn" id="btn-stop-camera" title="Stop AR">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <line x1="18" y1="6" x2="6" y2="18"></line>
-                <line x1="6" y1="6" x2="18" y2="18"></line>
-              </svg>
+            <button class="icon-btn-glass" id="btn-stop-camera" title="Exit AR">
+              ✕
             </button>
           </div>
         </header>
 
-        <!-- Full-Screen Viewfinder Frame (Spans Full Screen) -->
-        <div class="fullscreen-scan-frame" id="viewfinder-frame">
-          <div class="fs-corner fs-corner-tl"></div>
-          <div class="fs-corner fs-corner-tr"></div>
-          <div class="fs-corner fs-corner-bl"></div>
-          <div class="fs-corner fs-corner-br"></div>
-          <div class="fullscreen-scan-beam"></div>
+        <!-- Fullscreen Scanning Viewfinder Frame -->
+        <div class="viewfinder-container" id="viewfinder-frame">
+          <div class="hud-scanner-line"></div>
+          <div class="corner-bracket top-left"></div>
+          <div class="corner-bracket top-right"></div>
+          <div class="corner-bracket bottom-left"></div>
+          <div class="corner-bracket bottom-right"></div>
+          <div class="scan-target-hint" id="viewfinder-hint">
+            <span class="hint-icon">📱</span>
+            <span>Aim at Dhinesh Moorthy's Visiting Card</span>
+          </div>
         </div>
 
-        <div class="bottom-hud-bar">
-          <aside class="mini-target-badge" id="mini-target-badge">
-            <img src="${this.config.posterImageSrc}" alt="Target Thumbnail" />
-            <span>Target Poster</span>
-          </aside>
-          <div class="viewfinder-hint" id="viewfinder-hint">Scan from any distance (point anywhere at poster)</div>
+        <!-- 3D Era Role Banner (Floats when Tracking) -->
+        <div class="era-hologram-banner" id="era-banner" style="display: none;">
+          <div class="era-badge-row">
+            <span class="era-badge" id="era-badge-text">2026 • PRESENT</span>
+            <span class="era-company-badge" id="era-company-text">Olai Digital Studios</span>
+          </div>
+          <h2 class="era-role-title" id="era-role-title">Founder & Game Director</h2>
+          <p class="era-summary" id="era-summary-text"></p>
         </div>
+
+        <!-- Career Timeline Scrubber Bar -->
+        <footer class="timeline-hud-container" id="timeline-hud">
+          <div class="timeline-header-row">
+            <span class="timeline-label">CAREER TIMELINE</span>
+            <button class="autoplay-btn" id="btn-toggle-autoplay">
+              <span id="autoplay-icon">▶</span>
+              <span id="autoplay-text">Auto-Play Journey</span>
+            </button>
+          </div>
+
+          <div class="timeline-pills-row">
+            ${milestones.map((m, idx) => `
+              <button class="timeline-pill ${idx === 0 ? 'active' : ''}" data-index="${idx}" id="milestone-pill-${idx}">
+                <span class="pill-year">${m.displayYear}</span>
+                <span class="pill-role-abbr">${m.company.split('&')[0].trim()}</span>
+              </button>
+            `).join('')}
+          </div>
+        </footer>
       </section>
 
-      <!-- 4. ERROR Modal -->
-      <section class="ui-screen ui-screen-error" id="screen-error">
-        <div class="error-card glass-panel">
-          <div class="error-icon">
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#ff4d4f" stroke-width="2">
-              <circle cx="12" cy="12" r="10"></circle>
-              <line x1="12" y1="8" x2="12" y2="12"></line>
-              <line x1="12" y1="16" x2="12.01" y2="16"></line>
-            </svg>
-          </div>
-          <h2 class="error-title">Camera Access Required</h2>
-          <p class="error-detail" id="error-detail-text">
-            Camera permission was not granted or your browser does not support WebGL/WebRTC camera streams.
-          </p>
+      <!-- 4. Error View -->
+      <section class="ui-screen" id="screen-error" style="display: none;">
+        <div class="glass-panel error-card">
+          <div class="error-icon">⚠️</div>
+          <h3 id="error-title-text">AR Initialization Failed</h3>
+          <p id="error-detail-text">Unable to start camera session.</p>
           <div class="troubleshoot-tips">
-            <p><strong>Troubleshooting:</strong></p>
+            <strong>Troubleshooting tips:</strong>
             <ul>
-              <li>Ensure camera permission is allowed in browser site settings.</li>
-              <li>Connect via HTTPS (e.g. https://192.168.x.x:5173).</li>
-              <li>Use Google Chrome, Safari, or Microsoft Edge.</li>
+              <li>Ensure camera permissions are granted.</li>
+              <li>Use HTTPS or localhost in your browser.</li>
+              <li>Make sure no other app is using your camera.</li>
             </ul>
           </div>
           <button class="primary-btn" id="btn-retry">
@@ -174,31 +209,64 @@ export class UIController {
         </div>
       </section>
 
-      <!-- 5. Modal: Poster Preview & Fullscreen Presentation Mode -->
+      <!-- 5. Modal: Business Card Target Preview & Fullscreen Presentation -->
       <div class="poster-modal" id="poster-modal" style="display: none;">
         <div class="poster-modal-backdrop" id="poster-modal-backdrop"></div>
         <div class="poster-modal-content glass-panel" id="poster-modal-content">
-          <!-- Floating Exit Button in Maximized Mode -->
           <button class="exit-maximized-btn" id="btn-exit-maximized-poster">
             ✕ Exit Fullscreen
           </button>
           <div class="modal-header">
-            <h3>Sample AR Target Poster</h3>
+            <h3>Dhinesh Moorthy — AR Target Visiting Card</h3>
             <button class="close-btn" id="btn-close-poster-modal">✕</button>
           </div>
           <div class="modal-body">
-            <p class="modal-hint">Display this poster on your laptop or print it for testing:</p>
+            <p class="modal-hint">Display this visiting card on your laptop or print it to test tracking:</p>
             <div class="full-poster-wrapper" id="poster-display-box">
-              <img src="${this.config.posterImageSrc}" alt="AR Sample Poster" />
+              <img src="${this.config.posterImageSrc}" alt="Dhinesh Moorthy Visiting Card AR Target" />
             </div>
           </div>
           <div class="modal-footer">
             <button class="primary-btn-sm" id="btn-toggle-fullscreen-poster">
               🖥️ Maximize On Screen (Best for Phone Scanning)
             </button>
-            <a href="${this.config.posterImageSrc}" download="sample-poster.jpg" class="secondary-btn">
-              Download Image
+            <a href="${this.config.posterImageSrc}" download="dhinesh-moorthy-visiting-card.jpg" class="secondary-btn">
+              Download Card
             </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- 6. Modal: Detailed Project / Game Modal -->
+      <div class="poster-modal" id="project-details-modal" style="display: none;">
+        <div class="poster-modal-backdrop" id="project-modal-backdrop"></div>
+        <div class="poster-modal-content glass-panel" id="project-modal-content">
+          <div class="modal-header">
+            <div class="modal-badge-row">
+              <span class="badge-pill" id="modal-project-badge">🎮 Project</span>
+              <span class="era-company-badge" id="modal-project-period">2026</span>
+            </div>
+            <button class="close-btn" id="btn-close-project-modal">✕</button>
+          </div>
+          <div class="modal-body project-details-body">
+            <h2 id="modal-project-title" class="project-modal-title">Zen Fourier</h2>
+            <h4 id="modal-project-subtitle" class="project-modal-subtitle">Flagship Indie Game</h4>
+            <p id="modal-project-desc" class="project-modal-desc"></p>
+            
+            <div class="tech-tags-container" id="modal-project-tech-tags"></div>
+            
+            <div class="highlights-box">
+              <h5>Key Engineering Highlights:</h5>
+              <ul id="modal-project-highlights"></ul>
+            </div>
+          </div>
+          <div class="modal-footer" id="modal-project-footer">
+            <a href="#" target="_blank" rel="noopener" class="primary-btn" id="btn-modal-project-link">
+              <span>View Repository / Demo</span>
+            </a>
+            <button class="secondary-btn" id="btn-dismiss-project-modal">
+              Close
+            </button>
           </div>
         </div>
       </div>
@@ -207,6 +275,7 @@ export class UIController {
     this.statusTextElement = this.rootElement.querySelector('#loading-status-text');
     this.errorDetailElement = this.rootElement.querySelector('#error-detail-text');
     this.posterModalElement = this.rootElement.querySelector('#poster-modal');
+    this.projectDetailsModalElement = this.rootElement.querySelector('#project-details-modal');
 
     this.bindEvents();
     this.updateStateView();
@@ -226,6 +295,7 @@ export class UIController {
 
     const stopBtn = this.rootElement.querySelector('#btn-stop-camera');
     stopBtn?.addEventListener('click', () => {
+      this.stopAutoPlay();
       this.callbacks.onStopRequested();
       this.setState('IDLE');
     });
@@ -242,9 +312,6 @@ export class UIController {
     const hudTargetBtn = this.rootElement.querySelector('#btn-show-target-hud');
     hudTargetBtn?.addEventListener('click', () => this.showPosterModal(true));
 
-    const miniBadge = this.rootElement.querySelector('#mini-target-badge');
-    miniBadge?.addEventListener('click', () => this.showPosterModal(true));
-
     const closeModalBtn = this.rootElement.querySelector('#btn-close-poster-modal');
     closeModalBtn?.addEventListener('click', () => this.showPosterModal(false));
 
@@ -257,26 +324,176 @@ export class UIController {
       }
     });
 
-    // Universal Dual-Engine Fullscreen Presentation Toggle
+    // Fullscreen presentation
     const fsBtn = this.rootElement.querySelector('#btn-toggle-fullscreen-poster');
     fsBtn?.addEventListener('click', () => this.toggleMaximizePoster(true));
 
     const exitFsBtn = this.rootElement.querySelector('#btn-exit-maximized-poster');
     exitFsBtn?.addEventListener('click', () => this.toggleMaximizePoster(false));
 
-    // Listen for browser native fullscreen changes
-    document.addEventListener('fullscreenchange', () => {
-      if (!document.fullscreenElement && this.posterModalElement?.classList.contains('is-maximized')) {
-        this.toggleMaximizePoster(false, false);
+    // Project Details Modal Triggers
+    const closeProjModalBtn = this.rootElement.querySelector('#btn-close-project-modal');
+    closeProjModalBtn?.addEventListener('click', () => this.showProjectModal(false));
+
+    const dismissProjBtn = this.rootElement.querySelector('#btn-dismiss-project-modal');
+    dismissProjBtn?.addEventListener('click', () => this.showProjectModal(false));
+
+    const projBackdrop = this.rootElement.querySelector('#project-modal-backdrop');
+    projBackdrop?.addEventListener('click', () => this.showProjectModal(false));
+
+    const heroZenBtn = this.rootElement.querySelector('#btn-hero-zen-fourier');
+    heroZenBtn?.addEventListener('click', () => {
+      const zenProj = this.config.portfolio.milestones[3]?.projects[0];
+      if (zenProj) {
+        this.openProjectDetails(zenProj);
       }
     });
 
-    // Keyboard ESC to exit
+    // Timeline Milestone Pills
+    const milestones = this.config.portfolio.milestones;
+    milestones.forEach((_, idx) => {
+      const pill = this.rootElement.querySelector(`#milestone-pill-${idx}`);
+      pill?.addEventListener('click', () => {
+        this.stopAutoPlay();
+        this.selectMilestone(idx);
+      });
+    });
+
+    // Auto-Play Button
+    const autoPlayBtn = this.rootElement.querySelector('#btn-toggle-autoplay');
+    autoPlayBtn?.addEventListener('click', () => {
+      this.toggleAutoPlay();
+    });
+
+    // Keyboard ESC to exit modals
     window.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && this.posterModalElement?.classList.contains('is-maximized')) {
-        this.toggleMaximizePoster(false);
+      if (e.key === 'Escape') {
+        if (this.posterModalElement?.classList.contains('is-maximized')) {
+          this.toggleMaximizePoster(false);
+        } else if (this.projectDetailsModalElement?.style.display === 'flex') {
+          this.showProjectModal(false);
+        }
       }
     });
+  }
+
+  public selectMilestone(index: number): void {
+    const milestones = this.config.portfolio.milestones;
+    if (index < 0 || index >= milestones.length) return;
+
+    this.currentMilestoneIndex = index;
+
+    // Update active pill styling
+    milestones.forEach((_, idx) => {
+      const pill = this.rootElement.querySelector(`#milestone-pill-${idx}`);
+      if (pill) {
+        if (idx === index) pill.classList.add('active');
+        else pill.classList.remove('active');
+      }
+    });
+
+    this.updateActiveMilestoneUI();
+    this.callbacks.onMilestoneSelected?.(index);
+  }
+
+  private updateActiveMilestoneUI(): void {
+    const milestone = this.config.portfolio.milestones[this.currentMilestoneIndex];
+    if (!milestone) return;
+
+    const eraBadge = this.rootElement.querySelector('#era-badge-text');
+    const eraCompany = this.rootElement.querySelector('#era-company-text');
+    const eraRole = this.rootElement.querySelector('#era-role-title');
+    const eraSummary = this.rootElement.querySelector('#era-summary-text');
+    const eraBanner = this.rootElement.querySelector('#era-banner') as HTMLElement;
+
+    if (eraBadge) eraBadge.textContent = milestone.badge;
+    if (eraCompany) eraCompany.textContent = milestone.company;
+    if (eraRole) eraRole.textContent = milestone.role;
+    if (eraSummary) eraSummary.textContent = milestone.headline;
+
+    if (eraBanner && this.currentState === 'TRACKING') {
+      eraBanner.style.display = 'flex';
+      eraBanner.style.borderColor = milestone.accentColor;
+    }
+  }
+
+  private toggleAutoPlay(): void {
+    if (this.isAutoPlaying) {
+      this.stopAutoPlay();
+    } else {
+      this.startAutoPlay();
+    }
+  }
+
+  private startAutoPlay(): void {
+    this.isAutoPlaying = true;
+    const icon = this.rootElement.querySelector('#autoplay-icon');
+    const text = this.rootElement.querySelector('#autoplay-text');
+    if (icon) icon.textContent = '⏸';
+    if (text) text.textContent = 'Pause Journey';
+
+    if (this.autoPlayTimer) clearInterval(this.autoPlayTimer);
+    this.autoPlayTimer = window.setInterval(() => {
+      const nextIndex = (this.currentMilestoneIndex + 1) % this.config.portfolio.milestones.length;
+      this.selectMilestone(nextIndex);
+    }, this.AUTO_PLAY_INTERVAL_MS);
+  }
+
+  private stopAutoPlay(): void {
+    this.isAutoPlaying = false;
+    const icon = this.rootElement.querySelector('#autoplay-icon');
+    const text = this.rootElement.querySelector('#autoplay-text');
+    if (icon) icon.textContent = '▶';
+    if (text) text.textContent = 'Auto-Play Journey';
+
+    if (this.autoPlayTimer) {
+      clearInterval(this.autoPlayTimer);
+      this.autoPlayTimer = null;
+    }
+  }
+
+  public openProjectDetails(project: ProjectItem): void {
+    const title = this.rootElement.querySelector('#modal-project-title');
+    const subtitle = this.rootElement.querySelector('#modal-project-subtitle');
+    const badge = this.rootElement.querySelector('#modal-project-badge');
+    const period = this.rootElement.querySelector('#modal-project-period');
+    const desc = this.rootElement.querySelector('#modal-project-desc');
+    const techTags = this.rootElement.querySelector('#modal-project-tech-tags');
+    const highlights = this.rootElement.querySelector('#modal-project-highlights');
+    const linkBtn = this.rootElement.querySelector('#btn-modal-project-link') as HTMLAnchorElement;
+
+    if (title) title.textContent = project.title;
+    if (subtitle) subtitle.textContent = `${project.subtitle} • ${project.company}`;
+    if (badge) badge.textContent = `${project.icon} ${project.badge}`;
+    if (period) period.textContent = project.period;
+    if (desc) desc.textContent = project.description;
+
+    if (techTags) {
+      techTags.innerHTML = project.techStack
+        .map(t => `<span class="tech-tag" style="border-color:${project.accentColor};color:${project.accentColor};">${t}</span>`)
+        .join('');
+    }
+
+    if (highlights) {
+      highlights.innerHTML = project.highlights
+        .map(h => `<li>${h}</li>`)
+        .join('');
+    }
+
+    if (linkBtn) {
+      linkBtn.href = project.linkUrl || this.config.portfolio.socials.github;
+      linkBtn.style.background = project.color;
+      const span = linkBtn.querySelector('span');
+      if (span) span.textContent = project.linkText || 'View on GitHub';
+    }
+
+    this.showProjectModal(true);
+  }
+
+  private showProjectModal(show: boolean): void {
+    if (this.projectDetailsModalElement) {
+      this.projectDetailsModalElement.style.display = show ? 'flex' : 'none';
+    }
   }
 
   private toggleMaximizePoster(maximize: boolean, syncNative = true): void {
@@ -287,18 +504,14 @@ export class UIController {
       if (syncNative) {
         const el = this.posterModalElement as any;
         const requestFS = el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen || el.msRequestFullscreen;
-        if (typeof requestFS === 'function') {
-          requestFS.call(el).catch(() => {});
-        }
+        if (typeof requestFS === 'function') requestFS.call(el).catch(() => {});
       }
     } else {
       this.posterModalElement.classList.remove('is-maximized');
       if (syncNative && document.fullscreenElement) {
         const doc = document as any;
         const exitFS = doc.exitFullscreen || doc.webkitExitFullscreen || doc.mozCancelFullScreen || doc.msExitFullscreen;
-        if (typeof exitFS === 'function') {
-          exitFS.call(doc).catch(() => {});
-        }
+        if (typeof exitFS === 'function') exitFS.call(doc).catch(() => {});
       }
     }
   }
@@ -322,6 +535,8 @@ export class UIController {
     const hudStatusText = this.rootElement.querySelector('#hud-status-text') as HTMLElement;
     const viewfinderFrame = this.rootElement.querySelector('#viewfinder-frame') as HTMLElement;
     const viewfinderHint = this.rootElement.querySelector('#viewfinder-hint') as HTMLElement;
+    const eraBanner = this.rootElement.querySelector('#era-banner') as HTMLElement;
+    const timelineHud = this.rootElement.querySelector('#timeline-hud') as HTMLElement;
 
     if (idleScreen) idleScreen.style.display = this.currentState === 'IDLE' ? 'flex' : 'none';
     if (startingScreen) startingScreen.style.display = this.currentState === 'STARTING' ? 'flex' : 'none';
@@ -333,19 +548,29 @@ export class UIController {
     if (this.currentState === 'SCANNING') {
       if (trackingPill) {
         trackingPill.classList.remove('tracking-active');
-        trackingPill.classList.add('tracking-searching');
+        trackingPill.classList.add('tracking-scanning');
       }
-      if (hudStatusText) hudStatusText.textContent = 'Scanning full screen for poster...';
-      if (viewfinderFrame) viewfinderFrame.classList.remove('tracking-locked');
-      if (viewfinderHint) viewfinderHint.textContent = 'Scan anywhere across screen (natural distance)';
+      if (hudStatusText) hudStatusText.textContent = 'Scanning for Card...';
+      if (viewfinderFrame) {
+        viewfinderFrame.classList.remove('locked');
+        viewfinderFrame.classList.add('scanning');
+      }
+      if (viewfinderHint) viewfinderHint.style.display = 'flex';
+      if (eraBanner) eraBanner.style.display = 'none';
+      if (timelineHud) timelineHud.style.display = 'flex';
     } else if (this.currentState === 'TRACKING') {
       if (trackingPill) {
-        trackingPill.classList.remove('tracking-searching');
+        trackingPill.classList.remove('tracking-scanning');
         trackingPill.classList.add('tracking-active');
       }
-      if (hudStatusText) hudStatusText.textContent = '✓ Poster Detected';
-      if (viewfinderFrame) viewfinderFrame.classList.add('tracking-locked');
-      if (viewfinderHint) viewfinderHint.textContent = 'Animation Active & Locked';
+      if (hudStatusText) hudStatusText.textContent = '✨ Target Locked';
+      if (viewfinderFrame) {
+        viewfinderFrame.classList.remove('scanning');
+        viewfinderFrame.classList.add('locked');
+      }
+      if (viewfinderHint) viewfinderHint.style.display = 'none';
+      if (eraBanner) eraBanner.style.display = 'flex';
+      if (timelineHud) timelineHud.style.display = 'flex';
     }
   }
 }

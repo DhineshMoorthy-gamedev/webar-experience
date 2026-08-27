@@ -34,10 +34,15 @@ class App {
       },
       onRestartRequested: async () => {
         await this.restartExperience();
+      },
+      onMilestoneSelected: (index: number) => {
+        if (this.arExperience) {
+          this.arExperience.setMilestone(index);
+        }
       }
     });
 
-    // Create AR instance immediately
+    // Create AR Experience instance
     this.arExperience = new ARExperience(this.arContainer, DEFAULT_EXPERIENCE, {
       onStatusChange: (status) => {
         this.uiController?.setStatusMessage(status);

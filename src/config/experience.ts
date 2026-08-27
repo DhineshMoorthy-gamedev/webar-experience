@@ -1,27 +1,27 @@
+import { PortfolioConfig, PORTFOLIO_DATA } from './portfolio.ts';
+
 export interface ExperienceConfig {
-  id: string;
   title: string;
-  description: string;
-  targetSrc: string;
-  targetJsonSrc: string;
   posterImageSrc: string;
+  targetJsonSrc: string;
+  targetName: string;
   modelSrc: string;
   modelScale: [number, number, number];
   modelPosition: [number, number, number];
   modelRotation: [number, number, number];
   autoPlayAnimation: boolean;
+  portfolio: PortfolioConfig;
 }
 
 export const DEFAULT_EXPERIENCE: ExperienceConfig = {
-  id: 'sample-poster-experience',
-  title: 'WebAR Poster Experience',
-  description: 'Point your camera at the AR poster to trigger the 3D animated avatar.',
-  targetSrc: './targets/sample-poster.jpg',
-  targetJsonSrc: './targets/sample-poster.json',
-  posterImageSrc: './targets/sample-poster.jpg',
-  modelSrc: './models/sample-animation.glb',
-  modelScale: [1.2, 1.2, 1.2],
-  modelPosition: [0, 0, 0],
+  title: "Dhinesh Moorthy — AR Portfolio & Career Journey",
+  posterImageSrc: './targets/business-card.jpg',
+  targetJsonSrc: './targets/business-card.json',
+  targetName: 'business-card',
+  modelSrc: './models/character.glb',
+  modelScale: [1.1, 1.1, 1.1],
+  modelPosition: [0, -0.25, 0],
   modelRotation: [0, 0, 0],
-  autoPlayAnimation: true
+  autoPlayAnimation: true,
+  portfolio: PORTFOLIO_DATA
 };

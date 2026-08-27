@@ -15,7 +15,7 @@ export class ARExperience {
   private animController: AnimationController | null = null;
   private isRunning = false;
   private lostGraceTimeout: number | null = null;
-  private readonly GRACE_PERIOD_MS = 1200; // 1.2s grace window for fast panning and momentary motion blur
+  private readonly GRACE_PERIOD_MS = 1200;
   private initPromise: Promise<void> | null = null;
 
   constructor(
@@ -35,11 +35,11 @@ export class ARExperience {
       this.tracker = new TargetTracker(this.container, this.config, {
         onSessionStarted: async (scene) => {
           try {
-            this.callbacks.onStatusChange?.('Loading 3D animated avatar...');
+            this.callbacks.onStatusChange?.('Loading 3D holographic portfolio stage...');
             this.animController = new AnimationController(scene, this.config);
             await this.animController.loadModel();
 
-            this.callbacks.onStatusChange?.('Scanning full screen for poster...');
+            this.callbacks.onStatusChange?.('Scanning for Dhinesh Moorthy Visiting Card...');
             this.callbacks.onReady?.();
           } catch (err: any) {
             const error = err instanceof Error ? err : new Error(String(err));
@@ -92,6 +92,12 @@ export class ARExperience {
     })();
 
     return this.initPromise;
+  }
+
+  public setMilestone(index: number): void {
+    if (this.animController) {
+      this.animController.setMilestone(index);
+    }
   }
 
   public async start(): Promise<void> {
