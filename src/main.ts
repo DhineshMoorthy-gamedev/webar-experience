@@ -34,17 +34,6 @@ class App {
       },
       onRestartRequested: async () => {
         await this.restartExperience();
-      },
-      onMilestoneSelected: (index: number) => {
-        if (this.arExperience) {
-          this.arExperience.setMilestone(index);
-        }
-      },
-      onRotateRequested: () => {
-        if (this.arExperience) {
-          return this.arExperience.rotateOrientation();
-        }
-        return 0;
       }
     });
 

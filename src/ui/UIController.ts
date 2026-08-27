@@ -5,8 +5,6 @@ export interface UICallbacks {
   onStartRequested: () => Promise<void>;
   onStopRequested: () => void;
   onRestartRequested: () => Promise<void>;
-  onMilestoneSelected?: (index: number) => void;
-  onRotateRequested?: () => number;
 }
 
 export type UIState = 'IDLE' | 'STARTING' | 'SCANNING' | 'TRACKING' | 'ERROR';
@@ -17,12 +15,6 @@ export class UIController {
   private errorDetailElement: HTMLElement | null = null;
   private posterModalElement: HTMLElement | null = null;
   private projectDetailsModalElement: HTMLElement | null = null;
-  
-  // Timeline State
-  private currentMilestoneIndex = 0;
-  private isAutoPlaying = false;
-  private autoPlayTimer: number | null = null;
-  private readonly AUTO_PLAY_INTERVAL_MS = 5000;
 
   constructor(
     private rootElement: HTMLElement,
@@ -38,10 +30,6 @@ export class UIController {
 
     if (message && this.statusTextElement) {
       this.statusTextElement.textContent = message;
-    }
-
-    if (state === 'TRACKING') {
-      this.updateActiveMilestoneUI();
     }
   }
 
@@ -66,7 +54,6 @@ export class UIController {
 
   private render(): void {
     const portfolio = this.config.portfolio;
-    const milestones = portfolio.milestones;
 
     this.rootElement.innerHTML = `
       <!-- 1. Idle Hero View: Game Dev Portfolio Greeting -->
@@ -127,7 +114,7 @@ export class UIController {
         </div>
       </section>
 
-      <!-- 3. Active Scanning & Tracking HUD Overlay -->
+      <!-- 3. Clean AR HUD Overlay -->
       <section class="ui-screen" id="screen-active" style="display: none;">
         <!-- Top Navigation Bar -->
         <header class="hud-top-bar">
@@ -137,9 +124,6 @@ export class UIController {
           </div>
 
           <div class="hud-right-actions">
-            <button class="icon-btn-glass" id="btn-rotate-hud" title="Rotate 3D Alignment">
-              🔄 Rotate
-            </button>
             <button class="icon-btn-glass" id="btn-show-target-hud" title="Show Target Card">
               🪪 Target
             </button>
@@ -161,36 +145,6 @@ export class UIController {
             <span>Aim at Dhinesh Moorthy's Visiting Card</span>
           </div>
         </div>
-
-        <!-- 3D Era Role Banner (Floats when Tracking) -->
-        <div class="era-hologram-banner" id="era-banner" style="display: none;">
-          <div class="era-badge-row">
-            <span class="era-badge" id="era-badge-text">2026 • PRESENT</span>
-            <span class="era-company-badge" id="era-company-text">Olai Digital Studios</span>
-          </div>
-          <h2 class="era-role-title" id="era-role-title">Founder & Game Director</h2>
-          <p class="era-summary" id="era-summary-text"></p>
-        </div>
-
-        <!-- Career Timeline Scrubber Bar -->
-        <footer class="timeline-hud-container" id="timeline-hud">
-          <div class="timeline-header-row">
-            <span class="timeline-label">CAREER TIMELINE</span>
-            <button class="autoplay-btn" id="btn-toggle-autoplay">
-              <span id="autoplay-icon">▶</span>
-              <span id="autoplay-text">Auto-Play Journey</span>
-            </button>
-          </div>
-
-          <div class="timeline-pills-row">
-            ${milestones.map((m, idx) => `
-              <button class="timeline-pill ${idx === 0 ? 'active' : ''}" data-index="${idx}" id="milestone-pill-${idx}">
-                <span class="pill-year">${m.displayYear}</span>
-                <span class="pill-role-abbr">${m.company.split('&')[0].trim()}</span>
-              </button>
-            `).join('')}
-          </div>
-        </footer>
       </section>
 
       <!-- 4. Error View -->
@@ -299,17 +253,8 @@ export class UIController {
 
     const stopBtn = this.rootElement.querySelector('#btn-stop-camera');
     stopBtn?.addEventListener('click', () => {
-      this.stopAutoPlay();
       this.callbacks.onStopRequested();
       this.setState('IDLE');
-    });
-
-    const rotateBtn = this.rootElement.querySelector('#btn-rotate-hud');
-    rotateBtn?.addEventListener('click', () => {
-      const angle = this.callbacks.onRotateRequested?.();
-      if (rotateBtn) {
-        rotateBtn.textContent = `🔄 ${angle ?? 90}°`;
-      }
     });
 
     const retryBtn = this.rootElement.querySelector('#btn-retry');
@@ -361,22 +306,6 @@ export class UIController {
       }
     });
 
-    // Timeline Milestone Pills
-    const milestones = this.config.portfolio.milestones;
-    milestones.forEach((_, idx) => {
-      const pill = this.rootElement.querySelector(`#milestone-pill-${idx}`);
-      pill?.addEventListener('click', () => {
-        this.stopAutoPlay();
-        this.selectMilestone(idx);
-      });
-    });
-
-    // Auto-Play Button
-    const autoPlayBtn = this.rootElement.querySelector('#btn-toggle-autoplay');
-    autoPlayBtn?.addEventListener('click', () => {
-      this.toggleAutoPlay();
-    });
-
     // Keyboard ESC to exit modals
     window.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
@@ -387,81 +316,6 @@ export class UIController {
         }
       }
     });
-  }
-
-  public selectMilestone(index: number): void {
-    const milestones = this.config.portfolio.milestones;
-    if (index < 0 || index >= milestones.length) return;
-
-    this.currentMilestoneIndex = index;
-
-    // Update active pill styling
-    milestones.forEach((_, idx) => {
-      const pill = this.rootElement.querySelector(`#milestone-pill-${idx}`);
-      if (pill) {
-        if (idx === index) pill.classList.add('active');
-        else pill.classList.remove('active');
-      }
-    });
-
-    this.updateActiveMilestoneUI();
-    this.callbacks.onMilestoneSelected?.(index);
-  }
-
-  private updateActiveMilestoneUI(): void {
-    const milestone = this.config.portfolio.milestones[this.currentMilestoneIndex];
-    if (!milestone) return;
-
-    const eraBadge = this.rootElement.querySelector('#era-badge-text');
-    const eraCompany = this.rootElement.querySelector('#era-company-text');
-    const eraRole = this.rootElement.querySelector('#era-role-title');
-    const eraSummary = this.rootElement.querySelector('#era-summary-text');
-    const eraBanner = this.rootElement.querySelector('#era-banner') as HTMLElement;
-
-    if (eraBadge) eraBadge.textContent = milestone.badge;
-    if (eraCompany) eraCompany.textContent = milestone.company;
-    if (eraRole) eraRole.textContent = milestone.role;
-    if (eraSummary) eraSummary.textContent = milestone.headline;
-
-    if (eraBanner && this.currentState === 'TRACKING') {
-      eraBanner.style.display = 'flex';
-      eraBanner.style.borderColor = milestone.accentColor;
-    }
-  }
-
-  private toggleAutoPlay(): void {
-    if (this.isAutoPlaying) {
-      this.stopAutoPlay();
-    } else {
-      this.startAutoPlay();
-    }
-  }
-
-  private startAutoPlay(): void {
-    this.isAutoPlaying = true;
-    const icon = this.rootElement.querySelector('#autoplay-icon');
-    const text = this.rootElement.querySelector('#autoplay-text');
-    if (icon) icon.textContent = '⏸';
-    if (text) text.textContent = 'Pause Journey';
-
-    if (this.autoPlayTimer) clearInterval(this.autoPlayTimer);
-    this.autoPlayTimer = window.setInterval(() => {
-      const nextIndex = (this.currentMilestoneIndex + 1) % this.config.portfolio.milestones.length;
-      this.selectMilestone(nextIndex);
-    }, this.AUTO_PLAY_INTERVAL_MS);
-  }
-
-  private stopAutoPlay(): void {
-    this.isAutoPlaying = false;
-    const icon = this.rootElement.querySelector('#autoplay-icon');
-    const text = this.rootElement.querySelector('#autoplay-text');
-    if (icon) icon.textContent = '▶';
-    if (text) text.textContent = 'Auto-Play Journey';
-
-    if (this.autoPlayTimer) {
-      clearInterval(this.autoPlayTimer);
-      this.autoPlayTimer = null;
-    }
   }
 
   public openProjectDetails(project: ProjectItem): void {
@@ -547,8 +401,6 @@ export class UIController {
     const hudStatusText = this.rootElement.querySelector('#hud-status-text') as HTMLElement;
     const viewfinderFrame = this.rootElement.querySelector('#viewfinder-frame') as HTMLElement;
     const viewfinderHint = this.rootElement.querySelector('#viewfinder-hint') as HTMLElement;
-    const eraBanner = this.rootElement.querySelector('#era-banner') as HTMLElement;
-    const timelineHud = this.rootElement.querySelector('#timeline-hud') as HTMLElement;
 
     if (idleScreen) idleScreen.style.display = this.currentState === 'IDLE' ? 'flex' : 'none';
     if (startingScreen) startingScreen.style.display = this.currentState === 'STARTING' ? 'flex' : 'none';
@@ -568,8 +420,6 @@ export class UIController {
         viewfinderFrame.classList.add('scanning');
       }
       if (viewfinderHint) viewfinderHint.style.display = 'flex';
-      if (eraBanner) eraBanner.style.display = 'none';
-      if (timelineHud) timelineHud.style.display = 'flex';
     } else if (this.currentState === 'TRACKING') {
       if (trackingPill) {
         trackingPill.classList.remove('tracking-scanning');
@@ -581,8 +431,6 @@ export class UIController {
         viewfinderFrame.classList.add('locked');
       }
       if (viewfinderHint) viewfinderHint.style.display = 'none';
-      if (eraBanner) eraBanner.style.display = 'flex';
-      if (timelineHud) timelineHud.style.display = 'flex';
     }
   }
 }

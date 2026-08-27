@@ -7,9 +7,7 @@ export class AnimationController {
   private contentGroup: THREE.Group;
   private clock = new THREE.Clock();
 
-  // 8th Wall Image Target Coordinate System:
-  // Card Surface = XZ plane (X = width, Z = height)
-  // Normal (elevation towards camera/user) = +Y
+  // 3D Mechanical Card Hierarchy
   private cardChassisGroup: THREE.Group;
   private leftWingGroup: THREE.Group;
   private rightWingGroup: THREE.Group;
@@ -25,6 +23,7 @@ export class AnimationController {
   // 3D Milestone Floating Panels
   private milestoneNodeMeshes: { mesh: THREE.Group; index: number; basePos: THREE.Vector3 }[] = [];
   private activeProjectCardGroup: THREE.Group;
+  private activeCardMesh: THREE.Mesh | null = null;
   private particleGroup: THREE.Points | null = null;
 
   // Unfolding Animation State
@@ -32,7 +31,17 @@ export class AnimationController {
   private isTargetLocked = false;
   private activeMilestoneIndex = 0;
   private activeMilestone: CareerMilestone;
-  private orientationQuarterTurns = 1; // Default 90 deg rotation for horizontal landscape alignment
+
+  // Hardcoded Calibrated Orientations:
+  // Base Assembly: X = 90°, Y = 270°, Z = 0°
+  private readonly BASE_ROT_X = THREE.MathUtils.degToRad(90);
+  private readonly BASE_ROT_Y = THREE.MathUtils.degToRad(270);
+  private readonly BASE_ROT_Z = THREE.MathUtils.degToRad(0);
+
+  // Center Floating Panel: X = 270°, Y = 0°, Z = 0°
+  private readonly PANEL_ROT_X = THREE.MathUtils.degToRad(270);
+  private readonly PANEL_ROT_Y = THREE.MathUtils.degToRad(0);
+  private readonly PANEL_ROT_Z = THREE.MathUtils.degToRad(0);
 
   // Real-time tracking pose transforms
   private targetPos = new THREE.Vector3();
@@ -54,8 +63,8 @@ export class AnimationController {
 
     this.contentGroup = new THREE.Group();
     this.contentGroup.name = 'Content_Orientation_Holder';
-    // Apply 90 deg rotation around Y axis to align with horizontal card
-    this.contentGroup.rotation.y = (Math.PI / 2) * this.orientationQuarterTurns;
+    // Hardcoded Base Assembly Orientation
+    this.contentGroup.rotation.set(this.BASE_ROT_X, this.BASE_ROT_Y, this.BASE_ROT_Z);
     this.anchorGroup.add(this.contentGroup);
 
     this.cardChassisGroup = new THREE.Group();
@@ -64,6 +73,9 @@ export class AnimationController {
     this.centerCoreGroup = new THREE.Group();
     this.activeProjectCardGroup = new THREE.Group();
 
+    // Hardcoded Center Floating Panel Orientation
+    this.activeProjectCardGroup.rotation.set(this.PANEL_ROT_X, this.PANEL_ROT_Y, this.PANEL_ROT_Z);
+
     this.contentGroup.add(this.cardChassisGroup);
     this.contentGroup.add(this.leftWingGroup);
     this.contentGroup.add(this.rightWingGroup);
@@ -71,12 +83,6 @@ export class AnimationController {
     this.contentGroup.add(this.activeProjectCardGroup);
 
     this.activeMilestone = this.config.portfolio.milestones[0];
-  }
-
-  public rotateOrientation(): number {
-    this.orientationQuarterTurns = (this.orientationQuarterTurns + 1) % 4;
-    this.contentGroup.rotation.y = (Math.PI / 2) * this.orientationQuarterTurns;
-    return this.orientationQuarterTurns * 90;
   }
 
   public async loadModel(): Promise<void> {
@@ -406,7 +412,7 @@ export class AnimationController {
   }
 
   /**
-   * Renders the floating 3D project card standing upright facing the camera (XY plane at Z back)
+   * Renders the floating 3D project card standing upright facing the camera
    */
   private displayActiveProjectCard(milestone: CareerMilestone): void {
     while (this.activeProjectCardGroup.children.length > 0) {
@@ -416,16 +422,15 @@ export class AnimationController {
     const project = milestone.projects[0];
     if (!project) return;
 
-    const cardMesh = this.createFloatingCardMesh(project, milestone.accentColor);
+    this.activeCardMesh = this.createFloatingCardMesh(project, milestone.accentColor);
     
-    // Stands upright facing the user: positioned above the card along +Y, slightly set back along -Z
-    cardMesh.position.set(0, 0.28, -0.15);
-    cardMesh.rotation.set(-0.25, 0, 0); // Slight tilt towards camera
-    cardMesh.scale.set(0.01, 0.01, 0.01);
+    // Stands upright facing the user above the center of the card
+    this.activeCardMesh.position.set(0, 0.26, 0);
+    this.activeCardMesh.scale.set(0.01, 0.01, 0.01);
 
     // Spring scale-in animation
-    this.animateScale(cardMesh, 1.0);
-    this.activeProjectCardGroup.add(cardMesh);
+    this.animateScale(this.activeCardMesh, 1.0);
+    this.activeProjectCardGroup.add(this.activeCardMesh);
   }
 
   private createFloatingCardMesh(project: ProjectItem, accentColorHex: string): THREE.Mesh {
@@ -635,7 +640,7 @@ export class AnimationController {
 
     // 5. Floating Project Card gentle bobbing on Y
     if (this.activeProjectCardGroup) {
-      this.activeProjectCardGroup.position.y = 0.28 + Math.sin(time * 2.0) * 0.012;
+      this.activeProjectCardGroup.position.y = 0.02 + Math.sin(time * 2.0) * 0.012;
     }
 
     // 6. Particle Elevation on +Y

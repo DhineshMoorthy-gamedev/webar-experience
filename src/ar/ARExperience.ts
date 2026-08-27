@@ -100,13 +100,6 @@ export class ARExperience {
     }
   }
 
-  public rotateOrientation(): number {
-    if (this.animController) {
-      return this.animController.rotateOrientation();
-    }
-    return 0;
-  }
-
   public async start(): Promise<void> {
     await this.initialize();
 
