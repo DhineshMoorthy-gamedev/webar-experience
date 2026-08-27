@@ -105,8 +105,21 @@ export class TargetTracker {
       },
       listeners: [
         {
+          event: 'reality.imageloading',
+          process: ({ detail }: any) => {
+            console.log('[8th Wall] Image Target Loading:', detail);
+          }
+        },
+        {
+          event: 'reality.imagescanning',
+          process: ({ detail }: any) => {
+            console.log('[8th Wall] Image Targets Scanning:', detail);
+          }
+        },
+        {
           event: 'reality.imagefound',
           process: ({ detail }: { detail: ImageTargetDetail }) => {
+            console.log('[8th Wall] Target Found:', detail.name, detail.position);
             this.isTracking = true;
             this.callbacks.onTargetFound?.(detail);
           }
@@ -120,8 +133,15 @@ export class TargetTracker {
         {
           event: 'reality.imagelost',
           process: () => {
+            console.log('[8th Wall] Target Lost');
             this.isTracking = false;
             this.callbacks.onTargetLost?.();
+          }
+        },
+        {
+          event: 'reality.trackingstatus',
+          process: ({ detail }: any) => {
+            console.log('[8th Wall] Tracking Status:', detail?.status, detail?.reason);
           }
         }
       ]
@@ -151,9 +171,24 @@ export class TargetTracker {
     };
 
     if (targetJsonData) {
+      // Resolve all image target asset paths to absolute URLs
+      if (targetJsonData.imagePath) {
+        targetJsonData.imagePath = new URL(targetJsonData.imagePath, document.baseURI).href;
+      }
+      if (targetJsonData.resources) {
+        for (const k in targetJsonData.resources) {
+          const val = targetJsonData.resources[k];
+          if (val) {
+            targetJsonData.resources[k] = val.startsWith('http') || val.startsWith('./')
+              ? new URL(val, document.baseURI).href
+              : new URL(`./targets/${val}`, document.baseURI).href;
+          }
+        }
+      }
       xrConfig.imageTargetData = [targetJsonData];
+      console.log('[8th Wall] Configured imageTargetData with absolute URLs:', targetJsonData.name);
     } else {
-      xrConfig.imageTargets = ['sample-poster'];
+      xrConfig.imageTargets = ['business-card'];
     }
 
     XR8.XrController.configure(xrConfig);
