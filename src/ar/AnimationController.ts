@@ -6,7 +6,7 @@ export class AnimationController {
   private anchorGroup: THREE.Group;
   private clock = new THREE.Clock();
 
-  // 3D Mechanical Card Hierarchy
+  // 3D Mechanical Card Hierarchy (8th Wall Image Target Plane: XY = card surface, +Z = normal towards camera)
   private cardChassisGroup: THREE.Group;
   private leftWingGroup: THREE.Group;
   private rightWingGroup: THREE.Group;
@@ -79,30 +79,30 @@ export class AnimationController {
   }
 
   private setupLighting(): void {
-    const ambientLight = new THREE.AmbientLight(0xffffff, 1.6);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 1.8);
     this.scene.add(ambientLight);
 
     const cyanKeyLight = new THREE.DirectionalLight(0x00e5ff, 2.5);
-    cyanKeyLight.position.set(2, 4, 3);
+    cyanKeyLight.position.set(2, 2, 4);
     this.scene.add(cyanKeyLight);
 
     const pinkFillLight = new THREE.DirectionalLight(0xff007f, 1.8);
-    pinkFillLight.position.set(-2, 3, -2);
+    pinkFillLight.position.set(-2, -2, 3);
     this.scene.add(pinkFillLight);
 
     const coreLight = new THREE.PointLight(0x00e5ff, 3.0, 5);
-    coreLight.position.set(0, 0.3, 0);
+    coreLight.position.set(0, 0, 0.3);
     this.anchorGroup.add(coreLight);
   }
 
   /**
-   * 1. Center Base Chassis (Fits exact 3.5 x 2 ratio of the physical card)
+   * 1. Center Base Chassis (Fits 3.5 x 2 ratio of the physical card on XY plane)
    */
   private buildMechanicalCardChassis(): void {
-    const cardWidth = 0.70;
-    const cardHeight = 0.40;
+    const cardWidth = 0.85;
+    const cardHeight = 0.485;
 
-    // Beveled Main Baseplate
+    // Beveled Main Baseplate (XY Plane flat on card)
     const plateGeo = new THREE.PlaneGeometry(cardWidth, cardHeight);
     const plateMat = new THREE.MeshStandardMaterial({
       color: 0x080e1a,
@@ -111,7 +111,7 @@ export class AnimationController {
       side: THREE.DoubleSide
     });
     const basePlate = new THREE.Mesh(plateGeo, plateMat);
-    basePlate.rotation.x = -Math.PI / 2; // Flat on the card surface
+    basePlate.position.set(0, 0, 0.001);
     this.cardChassisGroup.add(basePlate);
 
     // Glowing Neon Chassis Border
@@ -121,36 +121,35 @@ export class AnimationController {
       linewidth: 3
     });
     const edgeLine = new THREE.LineSegments(edgesGeo, edgesMat);
-    edgeLine.rotation.x = -Math.PI / 2;
-    edgeLine.position.y = 0.002;
+    edgeLine.position.set(0, 0, 0.003);
     this.cardChassisGroup.add(edgeLine);
 
     // Corner Optical Anchor Beacons
     const beaconPositions = [
-      { x: -cardWidth / 2 + 0.03, z: -cardHeight / 2 + 0.03 },
-      { x: cardWidth / 2 - 0.03, z: -cardHeight / 2 + 0.03 },
-      { x: -cardWidth / 2 + 0.03, z: cardHeight / 2 - 0.03 },
-      { x: cardWidth / 2 - 0.03, z: cardHeight / 2 - 0.03 }
+      { x: -cardWidth / 2 + 0.04, y: -cardHeight / 2 + 0.04 },
+      { x: cardWidth / 2 - 0.04, y: -cardHeight / 2 + 0.04 },
+      { x: -cardWidth / 2 + 0.04, y: cardHeight / 2 - 0.04 },
+      { x: cardWidth / 2 - 0.04, y: cardHeight / 2 - 0.04 }
     ];
 
-    const beaconGeo = new THREE.CylinderGeometry(0.015, 0.015, 0.01, 16);
-    const beaconMat = new THREE.MeshBasicMaterial({ color: 0x00e5ff });
+    const beaconGeo = new THREE.CircleGeometry(0.018, 16);
+    const beaconMat = new THREE.MeshBasicMaterial({ color: 0x00e5ff, side: THREE.DoubleSide });
 
     beaconPositions.forEach((pos) => {
       const beacon = new THREE.Mesh(beaconGeo, beaconMat);
-      beacon.position.set(pos.x, 0.005, pos.z);
+      beacon.position.set(pos.x, pos.y, 0.005);
       this.cardChassisGroup.add(beacon);
     });
   }
 
   /**
-   * 2. Left Mechanical Wing (Slides Left: 2022 & 2023 Stations)
+   * 2. Left Mechanical Wing (Slides Left on X axis: 2022 & 2023 Stations)
    */
   private buildLeftWing(): void {
-    const wingWidth = 0.44;
-    const wingHeight = 0.36;
+    const wingWidth = 0.52;
+    const wingHeight = 0.44;
 
-    // Wing Sub-Chassis
+    // Wing Sub-Chassis (Flat on XY Plane)
     const wingGeo = new THREE.PlaneGeometry(wingWidth, wingHeight);
     const wingMat = new THREE.MeshStandardMaterial({
       color: 0x0b1329,
@@ -159,39 +158,37 @@ export class AnimationController {
       side: THREE.DoubleSide
     });
     const wingMesh = new THREE.Mesh(wingGeo, wingMat);
-    wingMesh.rotation.x = -Math.PI / 2;
-    wingMesh.position.set(-wingWidth / 2, 0.004, 0);
+    wingMesh.position.set(-wingWidth / 2, 0, 0.004);
     this.leftWingGroup.add(wingMesh);
 
     // Neon Wing Border
     const wingEdgeGeo = new THREE.EdgesGeometry(wingGeo);
     const wingEdgeMat = new THREE.LineBasicMaterial({ color: 0x7c4dff });
     const wingEdge = new THREE.LineSegments(wingEdgeGeo, wingEdgeMat);
-    wingEdge.rotation.x = -Math.PI / 2;
-    wingEdge.position.set(-wingWidth / 2, 0.006, 0);
+    wingEdge.position.set(-wingWidth / 2, 0, 0.006);
     this.leftWingGroup.add(wingEdge);
 
     // Milestone Pad 1: 2022 (College / Fabbox Studios / Merkel Intro)
     const pad2022 = this.createMilestonePad('2022', 'FABBOX & IITM', '#00e5ff', 0);
-    pad2022.position.set(-0.35, 0.01, -0.07);
+    pad2022.position.set(-0.38, 0.10, 0.01);
     this.leftWingGroup.add(pad2022);
     this.milestoneNodeMeshes.push({ mesh: pad2022, index: 0, basePos: pad2022.position.clone() });
 
     // Milestone Pad 2: 2023 (Merkel Haptic Systems VR Simulators)
     const pad2023 = this.createMilestonePad('2023', 'IITM HAPTICS XR', '#00e676', 1);
-    pad2023.position.set(-0.35, 0.01, 0.07);
+    pad2023.position.set(-0.38, -0.10, 0.01);
     this.leftWingGroup.add(pad2023);
     this.milestoneNodeMeshes.push({ mesh: pad2023, index: 1, basePos: pad2023.position.clone() });
   }
 
   /**
-   * 3. Right Mechanical Wing (Slides Right: 2024 & 2026 Stations)
+   * 3. Right Mechanical Wing (Slides Right on X axis: 2024 & 2026 Stations)
    */
   private buildRightWing(): void {
-    const wingWidth = 0.44;
-    const wingHeight = 0.36;
+    const wingWidth = 0.52;
+    const wingHeight = 0.44;
 
-    // Wing Sub-Chassis
+    // Wing Sub-Chassis (Flat on XY Plane)
     const wingGeo = new THREE.PlaneGeometry(wingWidth, wingHeight);
     const wingMat = new THREE.MeshStandardMaterial({
       color: 0x0b1329,
@@ -200,33 +197,31 @@ export class AnimationController {
       side: THREE.DoubleSide
     });
     const wingMesh = new THREE.Mesh(wingGeo, wingMat);
-    wingMesh.rotation.x = -Math.PI / 2;
-    wingMesh.position.set(wingWidth / 2, 0.004, 0);
+    wingMesh.position.set(wingWidth / 2, 0, 0.004);
     this.rightWingGroup.add(wingMesh);
 
     // Neon Wing Border
     const wingEdgeGeo = new THREE.EdgesGeometry(wingGeo);
     const wingEdgeMat = new THREE.LineBasicMaterial({ color: 0xff007f });
     const wingEdge = new THREE.LineSegments(wingEdgeGeo, wingEdgeMat);
-    wingEdge.rotation.x = -Math.PI / 2;
-    wingEdge.position.set(wingWidth / 2, 0.006, 0);
+    wingEdge.position.set(wingWidth / 2, 0, 0.006);
     this.rightWingGroup.add(wingEdge);
 
     // Milestone Pad 3: 2024 (Abhiwan Technologies Senior Unity)
     const pad2024 = this.createMilestonePad('2024', 'SENIOR UNITY', '#ffd600', 2);
-    pad2024.position.set(0.35, 0.01, -0.07);
+    pad2024.position.set(0.38, 0.10, 0.01);
     this.rightWingGroup.add(pad2024);
     this.milestoneNodeMeshes.push({ mesh: pad2024, index: 2, basePos: pad2024.position.clone() });
 
     // Milestone Pad 4: 2026 (Olai Digital Studios & Zen Fourier)
     const pad2026 = this.createMilestonePad('2026', 'OLAI & ZEN FOURIER', '#ff007f', 3);
-    pad2026.position.set(0.35, 0.01, 0.07);
+    pad2026.position.set(0.38, -0.10, 0.01);
     this.rightWingGroup.add(pad2026);
     this.milestoneNodeMeshes.push({ mesh: pad2026, index: 3, basePos: pad2026.position.clone() });
   }
 
   /**
-   * Creates a textured 3D milestone pad
+   * Creates a textured 3D milestone pad on XY plane
    */
   private createMilestonePad(year: string, label: string, colorHex: string, index: number): THREE.Group {
     const group = new THREE.Group();
@@ -256,7 +251,7 @@ export class AnimationController {
     const texture = new THREE.CanvasTexture(canvas);
     texture.minFilter = THREE.LinearFilter;
 
-    const geo = new THREE.PlaneGeometry(0.20, 0.08);
+    const geo = new THREE.PlaneGeometry(0.24, 0.095);
     const mat = new THREE.MeshBasicMaterial({
       map: texture,
       side: THREE.DoubleSide,
@@ -264,7 +259,6 @@ export class AnimationController {
     });
 
     const mesh = new THREE.Mesh(geo, mat);
-    mesh.rotation.x = -Math.PI / 2;
     group.add(mesh);
     (group as any).milestoneIndex = index;
 
@@ -275,8 +269,8 @@ export class AnimationController {
    * 4. Center Zen Fourier Harmonic Waveform Core
    */
   private buildCenterFourierCore(): void {
-    // Pedestal Chamber Ring
-    const ringGeo = new THREE.RingGeometry(0.09, 0.11, 32);
+    // Pedestal Chamber Ring (Flat on XY Plane)
+    const ringGeo = new THREE.RingGeometry(0.09, 0.12, 32);
     const ringMat = new THREE.MeshBasicMaterial({
       color: 0x00e5ff,
       side: THREE.DoubleSide,
@@ -284,24 +278,22 @@ export class AnimationController {
       opacity: 0.9
     });
     const ringMesh = new THREE.Mesh(ringGeo, ringMat);
-    ringMesh.rotation.x = -Math.PI / 2;
-    ringMesh.position.y = 0.01;
+    ringMesh.position.set(0, 0, 0.01);
     this.centerCoreGroup.add(ringMesh);
 
     // Inner Core Hex
-    const hexGeo = new THREE.RingGeometry(0.05, 0.07, 6);
+    const hexGeo = new THREE.RingGeometry(0.05, 0.075, 6);
     const hexMat = new THREE.MeshBasicMaterial({
       color: 0xff007f,
       side: THREE.DoubleSide,
       transparent: true,
-      opacity: 0.8
+      opacity: 0.85
     });
     const hexMesh = new THREE.Mesh(hexGeo, hexMat);
-    hexMesh.rotation.x = -Math.PI / 2;
-    hexMesh.position.y = 0.012;
+    hexMesh.position.set(0, 0, 0.012);
     this.centerCoreGroup.add(hexMesh);
 
-    // 3D Oscillating Fourier Mathematical Waveform
+    // 3D Oscillating Fourier Mathematical Waveform (along X, Y wave, Z elevated)
     this.fourierWaveGeometry = new THREE.BufferGeometry();
     const positions = new Float32Array(this.WAVE_POINT_COUNT * 3);
     this.fourierWaveGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
@@ -314,7 +306,7 @@ export class AnimationController {
     });
 
     this.fourierWaveMesh = new THREE.Line(this.fourierWaveGeometry, waveMaterial);
-    this.fourierWaveMesh.position.set(0, 0.08, 0);
+    this.fourierWaveMesh.position.set(0, 0, 0.04);
     this.centerCoreGroup.add(this.fourierWaveMesh);
   }
 
@@ -323,11 +315,11 @@ export class AnimationController {
    */
   private buildTimelineLaserTrack(): void {
     const curve = new THREE.CatmullRomCurve3([
-      new THREE.Vector3(-0.35, 0.02, -0.07), // 2022
-      new THREE.Vector3(-0.35, 0.02, 0.07),  // 2023
-      new THREE.Vector3(0.0, 0.05, 0.0),     // Center Core
-      new THREE.Vector3(0.35, 0.02, -0.07),  // 2024
-      new THREE.Vector3(0.35, 0.02, 0.07)    // 2026
+      new THREE.Vector3(-0.38, 0.10, 0.02),  // 2022
+      new THREE.Vector3(-0.38, -0.10, 0.02), // 2023
+      new THREE.Vector3(0.0, 0.0, 0.03),     // Center Core
+      new THREE.Vector3(0.38, 0.10, 0.02),   // 2024
+      new THREE.Vector3(0.38, -0.10, 0.02)   // 2026
     ]);
 
     const points = curve.getPoints(50);
@@ -335,20 +327,19 @@ export class AnimationController {
     const material = new THREE.LineBasicMaterial({
       color: 0x00e5ff,
       transparent: true,
-      opacity: 0.5
+      opacity: 0.6
     });
 
     this.timelineLaserTrack = new THREE.Line(geometry, material);
     this.anchorGroup.add(this.timelineLaserTrack);
 
-    // Energy Spark / Pulse
+    // Energy Spark / Pulse (Small sphere on circuit track)
     const sparkGeo = new THREE.SphereGeometry(0.015, 12, 12);
     const sparkMat = new THREE.MeshBasicMaterial({
-      color: 0xffffff,
-      wireframe: false
+      color: 0xffffff
     });
     this.laserPulseMesh = new THREE.Mesh(sparkGeo, sparkMat);
-    this.laserPulseMesh.position.set(0, 0.05, 0);
+    this.laserPulseMesh.position.set(0, 0, 0.03);
     this.anchorGroup.add(this.laserPulseMesh);
   }
 
@@ -361,9 +352,9 @@ export class AnimationController {
     const positions = new Float32Array(count * 3);
 
     for (let i = 0; i < count * 3; i += 3) {
-      positions[i] = (Math.random() - 0.5) * 1.2;
-      positions[i + 1] = Math.random() * 0.4 + 0.02;
-      positions[i + 2] = (Math.random() - 0.5) * 0.8;
+      positions[i] = (Math.random() - 0.5) * 1.4;
+      positions[i + 1] = (Math.random() - 0.5) * 0.8;
+      positions[i + 2] = Math.random() * 0.35 + 0.02;
     }
 
     geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
@@ -390,7 +381,7 @@ export class AnimationController {
   }
 
   /**
-   * Renders the floating 3D project card projected from the active wing
+   * Renders the floating 3D project card projected from the active wing (Facing User)
    */
   private displayActiveProjectCard(milestone: CareerMilestone): void {
     while (this.activeProjectCardGroup.children.length > 0) {
@@ -402,9 +393,8 @@ export class AnimationController {
 
     const cardMesh = this.createFloatingCardMesh(project, milestone.accentColor);
     
-    // Position floating above the center core facing the camera
-    cardMesh.position.set(0, 0.28, -0.05);
-    cardMesh.rotation.x = -0.25; // Tilted toward user for readability
+    // Position floating above the top edge of the card, elevated on +Z towards user
+    cardMesh.position.set(0, 0.42, 0.12);
     cardMesh.scale.set(0.01, 0.01, 0.01);
 
     // Spring scale-in animation
@@ -477,7 +467,7 @@ export class AnimationController {
     const texture = new THREE.CanvasTexture(canvas);
     texture.minFilter = THREE.LinearFilter;
 
-    const geo = new THREE.PlaneGeometry(0.52, 0.28);
+    const geo = new THREE.PlaneGeometry(0.58, 0.32);
     const mat = new THREE.MeshBasicMaterial({
       map: texture,
       side: THREE.DoubleSide,
@@ -541,60 +531,54 @@ export class AnimationController {
   }
 
   /**
-   * Real-time 60fps Animation Loop:
-   * - Smooth mechanical wing unfolding
-   * - Multi-frequency Zen Fourier wave calculation
-   * - Laser energy spark travel
-   * - Milestone node elevation
+   * Real-time 60fps Animation Loop on 8th Wall Image Plane (XY surface, +Z normal)
    */
   public update(): void {
     const time = this.clock.getElapsedTime();
 
     // 1. Kinetic Unfolding Transition (0 -> 1.0)
     if (this.isTargetLocked && this.unfoldProgress < 1.0) {
-      this.unfoldProgress = Math.min(1.0, this.unfoldProgress + 0.035);
+      this.unfoldProgress = Math.min(1.0, this.unfoldProgress + 0.04);
     } else if (!this.isTargetLocked && this.unfoldProgress > 0) {
       this.unfoldProgress = Math.max(0, this.unfoldProgress - 0.05);
     }
 
     const easeUnfold = Math.sin((this.unfoldProgress * Math.PI) / 2);
 
-    // Left Wing Slides Left (-0.28 units)
+    // Left Wing Slides Left along X axis (-0.38 units)
     if (this.leftWingGroup) {
-      this.leftWingGroup.position.x = -0.28 * easeUnfold;
-      this.leftWingGroup.rotation.z = 0.05 * (1 - easeUnfold);
+      this.leftWingGroup.position.x = -0.38 * easeUnfold;
     }
 
-    // Right Wing Slides Right (+0.28 units)
+    // Right Wing Slides Right along X axis (+0.38 units)
     if (this.rightWingGroup) {
-      this.rightWingGroup.position.x = 0.28 * easeUnfold;
-      this.rightWingGroup.rotation.z = -0.05 * (1 - easeUnfold);
+      this.rightWingGroup.position.x = 0.38 * easeUnfold;
     }
 
-    // Center Core Elevates Upward
+    // Center Core Elevates towards user on +Z
     if (this.centerCoreGroup) {
-      this.centerCoreGroup.position.y = 0.02 + 0.04 * easeUnfold;
-      this.centerCoreGroup.rotation.y = time * 0.5;
+      this.centerCoreGroup.position.z = 0.01 + 0.03 * easeUnfold;
+      this.centerCoreGroup.rotation.z = time * 0.4;
     }
 
-    // 2. Oscillating 3D Zen Fourier Waveform Synthesis
+    // 2. Oscillating 3D Zen Fourier Waveform Synthesis (on XY plane, oscillating in Y)
     if (this.fourierWaveGeometry) {
       const positions = this.fourierWaveGeometry.attributes.position.array as Float32Array;
-      const waveWidth = 0.45;
+      const waveWidth = 0.48;
       const is2026Active = this.activeMilestoneIndex === 3;
-      const speed = is2026Active ? time * 5.0 : time * 2.5;
-      const ampMult = is2026Active ? 1.5 : 0.8;
+      const speed = is2026Active ? time * 5.5 : time * 2.8;
+      const ampMult = is2026Active ? 1.5 : 0.85;
 
       for (let i = 0; i < this.WAVE_POINT_COUNT; i++) {
         const u = (i / (this.WAVE_POINT_COUNT - 1)) - 0.5;
         const x = u * waveWidth;
         
-        // Fourier Series Synthesis: Fundamental + 2nd & 3rd Harmonics
+        // Fourier Series Synthesis: Fundamental + Harmonics
         const f1 = Math.sin(u * 12.0 + speed) * 0.035;
         const f2 = Math.sin(u * 24.0 - speed * 1.5) * 0.015;
         const f3 = Math.cos(u * 36.0 + speed * 2.0) * 0.008;
         const y = (f1 + f2 + f3) * ampMult;
-        const z = Math.cos(u * 8.0 + speed * 0.8) * 0.02;
+        const z = 0.01 + Math.sin(u * 6.0 + speed) * 0.005;
 
         const idx = i * 3;
         positions[idx] = x;
@@ -607,31 +591,31 @@ export class AnimationController {
     // 3. Laser Energy Spark Travelling along the Circuit
     if (this.laserPulseMesh) {
       const targets = [
-        new THREE.Vector3(-0.28 - 0.35, 0.02, -0.07), // 2022
-        new THREE.Vector3(-0.28 - 0.35, 0.02, 0.07),  // 2023
-        new THREE.Vector3(0.28 + 0.35, 0.02, -0.07),  // 2024
-        new THREE.Vector3(0.28 + 0.35, 0.02, 0.07)    // 2026
+        new THREE.Vector3(-0.38 - 0.38, 0.10, 0.02),  // 2022
+        new THREE.Vector3(-0.38 - 0.38, -0.10, 0.02), // 2023
+        new THREE.Vector3(0.38 + 0.38, 0.10, 0.02),   // 2024
+        new THREE.Vector3(0.38 + 0.38, -0.10, 0.02)   // 2026
       ];
       const activeTarget = targets[this.activeMilestoneIndex] || targets[0];
-      this.laserPulseMesh.position.lerp(activeTarget, 0.12);
+      this.laserPulseMesh.position.lerp(activeTarget, 0.15);
     }
 
-    // 4. Milestone Node Elevation & Hover
+    // 4. Milestone Node Hover on +Z (towards user)
     this.milestoneNodeMeshes.forEach((node) => {
       const isActive = node.index === this.activeMilestoneIndex;
-      const targetY = isActive ? node.basePos.y + 0.025 + Math.sin(time * 3) * 0.005 : node.basePos.y;
-      node.mesh.position.y += (targetY - node.mesh.position.y) * 0.15;
+      const targetZ = isActive ? node.basePos.z + 0.03 + Math.sin(time * 3) * 0.006 : node.basePos.z;
+      node.mesh.position.z += (targetZ - node.mesh.position.z) * 0.15;
     });
 
-    // 5. Floating Project Card gentle bobbing
+    // 5. Floating Project Card gentle floating on Y & Z
     if (this.activeProjectCardGroup) {
-      this.activeProjectCardGroup.position.y = Math.sin(time * 2.0) * 0.012;
+      this.activeProjectCardGroup.position.y = 0.42 + Math.sin(time * 2.0) * 0.012;
     }
 
-    // 6. Particle Elevation
+    // 6. Particle Elevation on +Z
     if (this.particleGroup) {
       const positions = this.particleGroup.geometry.attributes.position.array as Float32Array;
-      for (let i = 1; i < positions.length; i += 3) {
+      for (let i = 2; i < positions.length; i += 3) {
         positions[i] += 0.002;
         if (positions[i] > 0.4) positions[i] = 0.01;
       }
