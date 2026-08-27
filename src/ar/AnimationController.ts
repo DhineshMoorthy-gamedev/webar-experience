@@ -4,6 +4,7 @@ import { CareerMilestone, ProjectItem } from '../config/portfolio.ts';
 
 export class AnimationController {
   private anchorGroup: THREE.Group;
+  private contentGroup: THREE.Group;
   private clock = new THREE.Clock();
 
   // 8th Wall Image Target Coordinate System:
@@ -31,6 +32,7 @@ export class AnimationController {
   private isTargetLocked = false;
   private activeMilestoneIndex = 0;
   private activeMilestone: CareerMilestone;
+  private orientationQuarterTurns = 1; // Default 90 deg rotation for horizontal landscape alignment
 
   // Real-time tracking pose transforms
   private targetPos = new THREE.Vector3();
@@ -50,19 +52,31 @@ export class AnimationController {
     this.anchorGroup.name = 'XR8_Mechanical_Card_Anchor';
     this.scene.add(this.anchorGroup);
 
+    this.contentGroup = new THREE.Group();
+    this.contentGroup.name = 'Content_Orientation_Holder';
+    // Apply 90 deg rotation around Y axis to align with horizontal card
+    this.contentGroup.rotation.y = (Math.PI / 2) * this.orientationQuarterTurns;
+    this.anchorGroup.add(this.contentGroup);
+
     this.cardChassisGroup = new THREE.Group();
     this.leftWingGroup = new THREE.Group();
     this.rightWingGroup = new THREE.Group();
     this.centerCoreGroup = new THREE.Group();
     this.activeProjectCardGroup = new THREE.Group();
 
-    this.anchorGroup.add(this.cardChassisGroup);
-    this.anchorGroup.add(this.leftWingGroup);
-    this.anchorGroup.add(this.rightWingGroup);
-    this.anchorGroup.add(this.centerCoreGroup);
-    this.anchorGroup.add(this.activeProjectCardGroup);
+    this.contentGroup.add(this.cardChassisGroup);
+    this.contentGroup.add(this.leftWingGroup);
+    this.contentGroup.add(this.rightWingGroup);
+    this.contentGroup.add(this.centerCoreGroup);
+    this.contentGroup.add(this.activeProjectCardGroup);
 
     this.activeMilestone = this.config.portfolio.milestones[0];
+  }
+
+  public rotateOrientation(): number {
+    this.orientationQuarterTurns = (this.orientationQuarterTurns + 1) % 4;
+    this.contentGroup.rotation.y = (Math.PI / 2) * this.orientationQuarterTurns;
+    return this.orientationQuarterTurns * 90;
   }
 
   public async loadModel(): Promise<void> {
@@ -94,7 +108,7 @@ export class AnimationController {
 
     const coreLight = new THREE.PointLight(0x00e5ff, 3.0, 5);
     coreLight.position.set(0, 0.3, 0);
-    this.anchorGroup.add(coreLight);
+    this.contentGroup.add(coreLight);
   }
 
   /**
@@ -342,7 +356,7 @@ export class AnimationController {
     });
 
     this.timelineLaserTrack = new THREE.Line(geometry, material);
-    this.anchorGroup.add(this.timelineLaserTrack);
+    this.contentGroup.add(this.timelineLaserTrack);
 
     // Energy Spark / Pulse (Small sphere on circuit track)
     const sparkGeo = new THREE.SphereGeometry(0.015, 12, 12);
@@ -351,7 +365,7 @@ export class AnimationController {
     });
     this.laserPulseMesh = new THREE.Mesh(sparkGeo, sparkMat);
     this.laserPulseMesh.position.set(0, 0.04, 0);
-    this.anchorGroup.add(this.laserPulseMesh);
+    this.contentGroup.add(this.laserPulseMesh);
   }
 
   /**
@@ -378,7 +392,7 @@ export class AnimationController {
     });
 
     this.particleGroup = new THREE.Points(geometry, material);
-    this.anchorGroup.add(this.particleGroup);
+    this.contentGroup.add(this.particleGroup);
   }
 
   public setMilestone(index: number): void {

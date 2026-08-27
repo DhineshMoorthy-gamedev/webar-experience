@@ -6,6 +6,7 @@ export interface UICallbacks {
   onStopRequested: () => void;
   onRestartRequested: () => Promise<void>;
   onMilestoneSelected?: (index: number) => void;
+  onRotateRequested?: () => number;
 }
 
 export type UIState = 'IDLE' | 'STARTING' | 'SCANNING' | 'TRACKING' | 'ERROR';
@@ -136,6 +137,9 @@ export class UIController {
           </div>
 
           <div class="hud-right-actions">
+            <button class="icon-btn-glass" id="btn-rotate-hud" title="Rotate 3D Alignment">
+              🔄 Rotate
+            </button>
             <button class="icon-btn-glass" id="btn-show-target-hud" title="Show Target Card">
               🪪 Target
             </button>
@@ -298,6 +302,14 @@ export class UIController {
       this.stopAutoPlay();
       this.callbacks.onStopRequested();
       this.setState('IDLE');
+    });
+
+    const rotateBtn = this.rootElement.querySelector('#btn-rotate-hud');
+    rotateBtn?.addEventListener('click', () => {
+      const angle = this.callbacks.onRotateRequested?.();
+      if (rotateBtn) {
+        rotateBtn.textContent = `🔄 ${angle ?? 90}°`;
+      }
     });
 
     const retryBtn = this.rootElement.querySelector('#btn-retry');
